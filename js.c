@@ -4,6 +4,9 @@
 #include <assert.h>
 #include <furi.h>
 #include <gui/gui.h>
+//#include <storage/storage.h>
+//#include <toolbox/stream/stream.h>
+//#include <toolbox/stream/file_stream.h>
 
 #include "microvium.h"
 
@@ -13,7 +16,7 @@
 #define IMPORT_PRINT 1
 
 // A function exported by VM to for the host to call
-const mvm_VMExportID SAY_HELLO = 1234;
+const mvm_VMExportID MAIN = 1234;
 
 mvm_TeError resolveImport(mvm_HostFunctionID id, void*, mvm_TfHostFunction* out);
 mvm_TeError print(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
@@ -30,6 +33,9 @@ int conX;
 
 //JSThread* main_js_thread;
 
+InputEvent event;
+FuriMessageQueue* event_queue;
+
 static void draw_callback(Canvas* canvas, void* context) {
     UNUSED(context);
     canvas_set_font(canvas, FontSecondary);
@@ -42,18 +48,18 @@ static void input_callback(InputEvent* input_event, void* ctx) {
     furi_message_queue_put(event_queue, input_event, FuriWaitForever);
 }
 
-static int32_t js_run() {
+int32_t js_run(size_t fileSize) {
     mvm_TeError err;
     mvm_VM* vm;
     mvm_Value sayHello;
     mvm_Value result;
 
     // Restore the VM from the snapshot
-    err = mvm_restore(&vm, script_mvm_bc, script_mvm_bc_len, NULL, resolveImport);
+    err = mvm_restore(&vm, script_mvm_bc, fileSize, NULL, resolveImport);
     if (err != MVM_E_SUCCESS) return err;
 
     // Find the "sayHello" function exported by the VM
-    err = mvm_resolveExports(vm, &SAY_HELLO, &sayHello, 1);
+    err = mvm_resolveExports(vm, &MAIN, &sayHello, 1);
     if (err != MVM_E_SUCCESS) return err;
 
     // Call "sayHello"
@@ -81,8 +87,8 @@ static void configure_and_start_thread(int funcID) {
 */
 
 int32_t js_app() {
-    InputEvent event;
-    FuriMessageQueue* event_queue = furi_message_queue_alloc(8, sizeof(InputEvent));
+    //size_t fileSize;
+    event_queue = furi_message_queue_alloc(8, sizeof(InputEvent));
 
     ViewPort* view_port = view_port_alloc();
     view_port_draw_callback_set(view_port, draw_callback, NULL);
@@ -91,12 +97,21 @@ int32_t js_app() {
     Gui* gui = furi_record_open(RECORD_GUI);
     gui_add_view_port(gui, view_port, GuiLayerFullscreen);
 
+    /*
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    Stream* stream = file_stream_alloc(storage);
+    file_stream_open(stream, "/ext/script.mvm-bc", FSAM_READ, FSOM_OPEN_EXISTING);
+    fileSize = stream_size(stream);
+    file_stream_close(stream);
+    stream_free(stream);
+    */
+
     conLog = furi_string_alloc();
 
     while(1) {
         furi_check(furi_message_queue_get(event_queue, &event, FuriWaitForever) == FuriStatusOk);
         if(event.key == InputKeyOk) {
-            js_run();
+            js_run(script_mvm_bc_len); //storage_file_size(bytecode));
             break;
         }
     }
@@ -118,6 +133,11 @@ int32_t js_app() {
     }
 
     furi_string_free(conLog);
+
+    //storage_file_close(bytecode);
+    //storage_file_free(bytecode);
+
+    //furi_record_close(RECORD_STORAGE);
 
     furi_message_queue_free(event_queue);
     gui_remove_view_port(gui, view_port);
