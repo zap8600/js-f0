@@ -25,13 +25,15 @@ typedef struct {
 */
 
 FuriString* conLog;
+int conY;
+int conX;
 
 //JSThread* main_js_thread;
 
 static void draw_callback(Canvas* canvas, void* context) {
     UNUSED(context);
     canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str(canvas, 75, 30, furi_string_get_cstr(conLog));
+    canvas_draw_str(canvas, conX, conY, furi_string_get_cstr(conLog));
 }
 
 static void input_callback(InputEvent* input_event, void* ctx) {
@@ -147,7 +149,9 @@ mvm_TeError resolveImport(mvm_HostFunctionID funcID, void* context, mvm_TfHostFu
 mvm_TeError print(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
     UNUSED(funcID);
     UNUSED(result);
-    furi_assert(argCount == 1);
+    furi_assert(argCount == 3);
     furi_string_printf(conLog, "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
+    conX = mvm_toInt32(vm, args[1]);
+    conY = mvm_toInt32(vm, args[2]);
     return MVM_E_SUCCESS;
 }
