@@ -4,13 +4,13 @@
 #include <assert.h>
 #include <furi.h>
 #include <gui/gui.h>
-//#include <storage/storage.h>
+#include <storage/storage.h>
 //#include <toolbox/stream/stream.h>
 //#include <toolbox/stream/file_stream.h>
 
 #include "microvium.h"
 
-#include "script.mvm-bc.h"
+//#include "script.mvm-bc.h"
 
 // A function in the host (this file) for the VM to call
 #define IMPORT_PRINT 1
@@ -33,8 +33,8 @@ int conX;
 
 //JSThread* main_js_thread;
 
-InputEvent event;
-FuriMessageQueue* event_queue;
+//InputEvent event;
+//FuriMessageQueue* event_queue;
 
 static void draw_callback(Canvas* canvas, void* context) {
     UNUSED(context);
@@ -48,23 +48,32 @@ static void input_callback(InputEvent* input_event, void* ctx) {
     furi_message_queue_put(event_queue, input_event, FuriWaitForever);
 }
 
-int32_t js_run(size_t fileSize) {
+int32_t js_run(uint8_t* fileBuff, size_t fileSize) {
     mvm_TeError err;
     mvm_VM* vm;
-    mvm_Value sayHello;
+    mvm_Value main;
     mvm_Value result;
 
     // Restore the VM from the snapshot
-    err = mvm_restore(&vm, script_mvm_bc, fileSize, NULL, resolveImport);
-    if (err != MVM_E_SUCCESS) return err;
+    err = mvm_restore(&vm, fileBuff, fileSize, NULL, resolveImport);
+    if (err != MVM_E_SUCCESS) {
+        FURI_LOG_E("microvium", "Error with restore: %d", err);
+        return err;
+    }
 
     // Find the "sayHello" function exported by the VM
-    err = mvm_resolveExports(vm, &MAIN, &sayHello, 1);
-    if (err != MVM_E_SUCCESS) return err;
+    err = mvm_resolveExports(vm, &MAIN, &main, 1);
+    if (err != MVM_E_SUCCESS) {
+        FURI_LOG_E("microvium", "Error with exports: %d", err);
+        return err;
+    }
 
     // Call "sayHello"
-    err = mvm_call(vm, sayHello, &result, NULL, 0);
-    if (err != MVM_E_SUCCESS) return err;
+    err = mvm_call(vm, main, &result, NULL, 0);
+    if (err != MVM_E_SUCCESS) {
+        FURI_LOG_E("microvium", "Error with call: %d", err);
+        return err;
+    }
 
     // Clean up
     mvm_runGC(vm, true);
@@ -88,7 +97,21 @@ static void configure_and_start_thread(int funcID) {
 
 int32_t js_app() {
     //size_t fileSize;
-    event_queue = furi_message_queue_alloc(8, sizeof(InputEvent));
+    InputEvent event;
+    FuriMessageQueue* event_queue = furi_message_queue_alloc(8, sizeof(InputEvent));
+
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    File* bytecode = storage_file_alloc(storage);
+    storage_file_open(bytecode, EXT_PATH("script.mvm-bc"), FSAM_READ, FSOM_OPEN_EXISTING);
+    size_t fileSize = storage_file_size(bytecode);
+    FURI_LOG_I("microvium", "File Size: %d", fileSize);
+    uint8_t* fileBuff;
+    fileBuff = malloc(fileSize);
+    storage_file_read(bytecode, fileBuff, fileSize);
+    storage_file_close(bytecode);
+    storage_file_free(bytecode);
+
+    furi_record_close(RECORD_STORAGE);
 
     ViewPort* view_port = view_port_alloc();
     view_port_draw_callback_set(view_port, draw_callback, NULL);
@@ -99,6 +122,8 @@ int32_t js_app() {
 
     /*
     Storage* storage = furi_record_open(RECORD_STORAGE);
+    File* bytecode = storage_file_alloc(storage);
+    storage_file_open(bytecode, EXT_PATH("script.mvm-bc"), FSAM_READ, FSOM_OPEN_EXISTING);
     Stream* stream = file_stream_alloc(storage);
     file_stream_open(stream, "/ext/script.mvm-bc", FSAM_READ, FSOM_OPEN_EXISTING);
     fileSize = stream_size(stream);
@@ -111,7 +136,7 @@ int32_t js_app() {
     while(1) {
         furi_check(furi_message_queue_get(event_queue, &event, FuriWaitForever) == FuriStatusOk);
         if(event.key == InputKeyOk) {
-            js_run(script_mvm_bc_len); //storage_file_size(bytecode));
+            js_run(fileBuff, fileSize); //storage_file_size(bytecode));
             break;
         }
     }
@@ -134,10 +159,12 @@ int32_t js_app() {
 
     furi_string_free(conLog);
 
-    //storage_file_close(bytecode);
-    //storage_file_free(bytecode);
+    /*
+    storage_file_close(bytecode);
+    storage_file_free(bytecode);
 
-    //furi_record_close(RECORD_STORAGE);
+    furi_record_close(RECORD_STORAGE);
+    */
 
     furi_message_queue_free(event_queue);
     gui_remove_view_port(gui, view_port);
