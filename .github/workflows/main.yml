@@ -1,9 +1,9 @@
-name: "FAP: Build and lint"
+name: "FAP: Build"
 on: [push, pull_request]
 jobs:
   ufbt-build-action:
     runs-on: ubuntu-latest
-    name: 'ufbt: Build for Dev branch'
+    name: 'ufbt: Build for Release branch'
     steps:
       - name: Checkout
         uses: actions/checkout@v3
