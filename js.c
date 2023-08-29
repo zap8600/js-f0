@@ -12,9 +12,9 @@
 #define TAG "microvium"
 
 // A function in the host (this file) for the VM to call
-#define IMPORT_CONSOLE_CLEAR 2
-#define IMPORT_CONSOLE_LOG 13
-#define IMPORT_CONSOLE_WARN 19
+#define IMPORT_CONSOLE_CLEAR 1
+#define IMPORT_CONSOLE_LOG 2
+#define IMPORT_CONSOLE_WARN 3
 
 // A function exported by VM to for the host to call
 const mvm_VMExportID INIT = 1;
@@ -129,8 +129,6 @@ int32_t js_app() {
 
     furi_record_close(RECORD_STORAGE);
 
-    console = malloc(sizeof(Console));
-
     view_port = view_port_alloc();
     view_port_draw_callback_set(view_port, draw_callback, NULL);
     view_port_input_callback_set(view_port, input_callback, event_queue);
@@ -138,6 +136,7 @@ int32_t js_app() {
     Gui* gui = furi_record_open(RECORD_GUI);
     gui_add_view_port(gui, view_port, GuiLayerFullscreen);
 
+    console = malloc(sizeof(Console));
     console->conLog = furi_string_alloc();
 
     while(1) {
