@@ -46,8 +46,8 @@ typedef struct {
 } MyEvent;
 
 typedef enum {
-    MyViewId,
-    MyOtherViewId,
+    JSMain,
+    JSConsole,
 } ViewId;
 
 FuriMessageQueue* queue;
@@ -92,10 +92,8 @@ bool custom_event_callback(void* context, uint32_t event) {
     ViewDispatcher* view_dispatcher = context;
 
     if(event == 42) {
-        if(current_view == MyViewId) {
-            current_view = MyOtherViewId;
-        } else {
-            current_view = MyViewId;
+        if(current_view == JSMain) {
+            current_view = JSConsole;
         }
 
         view_dispatcher_switch_to_view(view_dispatcher, current_view);
@@ -105,6 +103,10 @@ bool custom_event_callback(void* context, uint32_t event) {
     // NOTE: The return value is not currently used by the ViewDispatcher.
     return handled;
 }
+
+static uint32_t exit_console_callback(void* context) {
+    return JSMain;
+} 
 
 int32_t js_run(uint8_t* fileBuff, size_t fileSize) {
     mvm_TeError err;
@@ -166,6 +168,7 @@ int32_t js_app() {
 
     TextBox* text_box = text_box_alloc();
     text_box_set_font(text_box, TextBoxFontText);
+    view_set_previous_callback(text_box_get_view(text_box), exit_console_callback);
 
     // set param 1 of custom event callback (impacts tick and navigation too).
     view_dispatcher_set_event_callback_context(view_dispatcher, context);
