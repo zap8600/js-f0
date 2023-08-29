@@ -4,9 +4,12 @@
 #include <assert.h>
 #include <furi.h>
 #include <gui/gui.h>
+#include <gui/elements.h>
 #include <storage/storage.h>
 
 #include "microvium.h"
+
+#define TAG "microvium"
 
 // A function in the host (this file) for the VM to call
 #define IMPORT_CONSOLE_CLEAR 2
@@ -24,18 +27,26 @@ mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* resu
 mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError console_warn(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 
-typedef enum CON_EVENT {
+/*
+typedef enum { // typedef enum CON_EVENT {
     CON_NONE, // no event
     CON_CLEAR, // console.clear();
     CON_LOG, // console.log();
     CON_WARN, // console.warn(); shouldn't do anything in draw_callback
 } CON_EVENT;
+*/
 
 typedef struct {
+    /*
+    uint32_t idx;
+    FuriMutex* mutex;
+    */
     FuriString* conLog;
+    /*
     int conY;
     int conX;
-    CON_EVENT conEvent;
+    */
+    // CON_EVENT conEvent;
 } Console;
 
 Console* console;
@@ -45,16 +56,21 @@ ViewPort* view_port;
 static void draw_callback(Canvas* canvas, void* context) {
     UNUSED(context);
     canvas_set_font(canvas, FontSecondary);
+    canvas_draw_frame(canvas, 0, 0, 128, 22);
+    elements_text_box(canvas, 0, 0, 128, 22, AlignCenter, AlignTop, furi_string_get_cstr(console->conLog), false);
+    /*
     if (console->conEvent == CON_NONE) {
         // do nothing
     } else if (console->conEvent == CON_CLEAR) {
         canvas_clear(canvas);
+        canvas_draw_frame(canvas, 0, 0, 128, 22);
     } else if (console->conEvent == CON_LOG) {
         canvas_draw_str(canvas, console->conX, console->conY, furi_string_get_cstr(console->conLog));
     } else if (console->conEvent == CON_WARN) {
         // do nothing
     }
     console->conEvent = CON_NONE;
+    */
 }
 
 static void input_callback(InputEvent* input_event, void* ctx) {
@@ -72,21 +88,21 @@ int32_t js_run(uint8_t* fileBuff, size_t fileSize) {
     // Restore the VM from the snapshot
     err = mvm_restore(&vm, fileBuff, fileSize, NULL, resolveImport);
     if (err != MVM_E_SUCCESS) {
-        FURI_LOG_E("microvium", "Error with restore: %d", err);
+        FURI_LOG_E(TAG, "Error with restore: %d", err);
         return err;
     }
 
     // Find the "sayHello" function exported by the VM
     err = mvm_resolveExports(vm, &INIT, &init, 1);
     if (err != MVM_E_SUCCESS) {
-        FURI_LOG_E("microvium", "Error with exports: %d", err);
+        FURI_LOG_E(TAG, "Error with exports: %d", err);
         return err;
     }
 
     // Call "sayHello"
     err = mvm_call(vm, init, &result, NULL, 0);
     if (err != MVM_E_SUCCESS) {
-        FURI_LOG_E("microvium", "Error with call: %d", err);
+        FURI_LOG_E(TAG, "Error with call: %d", err);
         return err;
     }
 
@@ -113,6 +129,8 @@ int32_t js_app() {
 
     furi_record_close(RECORD_STORAGE);
 
+    console = malloc(sizeof(Console));
+
     view_port = view_port_alloc();
     view_port_draw_callback_set(view_port, draw_callback, NULL);
     view_port_input_callback_set(view_port, input_callback, event_queue);
@@ -120,7 +138,6 @@ int32_t js_app() {
     Gui* gui = furi_record_open(RECORD_GUI);
     gui_add_view_port(gui, view_port, GuiLayerFullscreen);
 
-    console = malloc(sizeof(Console));
     console->conLog = furi_string_alloc();
 
     while(1) {
@@ -152,7 +169,7 @@ int32_t js_app() {
 
 void fatalError(void* vm, int e) {
     UNUSED(vm);
-    FURI_LOG_E("microvium", "Error: %d\n", e);
+    FURI_LOG_E(TAG, "Error: %d\n", e);
     furi_crash("Microvium fatal error");
 }
 
@@ -179,7 +196,9 @@ mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* resu
     UNUSED(result);
     UNUSED(args);
     furi_assert(argCount == 0);
-    console->conEvent = CON_CLEAR;
+    // console->conEvent = CON_CLEAR;
+    FURI_LOG_I(TAG, "console.clear()\n");
+    furi_string_reset(console->conLog);
     view_port_update(view_port);
     return MVM_E_SUCCESS;
 }
@@ -187,11 +206,14 @@ mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* resu
 mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
     UNUSED(funcID);
     UNUSED(result);
-    furi_assert(argCount == 3);
+    furi_assert(argCount == 1); // furi_assert(argCount == 3);
+    FURI_LOG_I(TAG, "console.log()\n");
     furi_string_printf(console->conLog, "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
+    /*
     console->conX = mvm_toInt32(vm, args[1]);
     console->conY = mvm_toInt32(vm, args[2]);
     console->conEvent = CON_LOG;
+    */
     view_port_update(view_port);
     return MVM_E_SUCCESS;
 }
@@ -200,7 +222,8 @@ mvm_TeError console_warn(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* resul
     UNUSED(funcID);
     UNUSED(result);
     furi_assert(argCount == 1);
-    FURI_LOG_W("microvium", "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
-    console->conEvent = CON_WARN;
+    FURI_LOG_I(TAG, "console.warn()")
+    FURI_LOG_W(TAG, "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
+    // console->conEvent = CON_WARN;
     return MVM_E_SUCCESS;
 }
