@@ -56,8 +56,8 @@ ViewPort* view_port;
 static void draw_callback(Canvas* canvas, void* context) {
     UNUSED(context);
     canvas_set_font(canvas, FontSecondary);
-    canvas_draw_frame(canvas, 0, 0, 128, 50);
-    elements_text_box(canvas, 0, 0, 128, 50, AlignCenter, AlignTop, "chimken", true); // furi_string_get_cstr(console->conLog)
+    canvas_draw_frame(canvas, 0, 0, 128, 64);
+    elements_text_box(canvas, 0, 0, 128, 64, AlignLeft, AlignTop, furi_string_get_cstr(console->conLog), true); // furi_string_get_cstr(console->conLog)
     /*
     if (console->conEvent == CON_NONE) {
         // do nothing
