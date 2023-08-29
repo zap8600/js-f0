@@ -29,32 +29,29 @@ mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* resu
 mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError console_warn(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 
-/*
-typedef enum { // typedef enum CON_EVENT {
-    CON_NONE, // no event
-    CON_CLEAR, // console.clear();
-    CON_LOG, // console.log();
-    CON_WARN, // console.warn(); shouldn't do anything in draw_callback
-} CON_EVENT;
-*/
-
 typedef struct {
-    /*
-    uint32_t idx;
-    FuriMutex* mutex;
-    */
     FuriString* conLog;
-    /*
-    int conY;
-    int conX;
-    */
-    // CON_EVENT conEvent;
 } Console;
 
 Console* console;
 
-ViewId current_view;
+typedef enum {
+    MyEventTypeKey,
+    MyEventTypeDone,
+} MyEventType;
+
+typedef struct {
+    MyEventType type; // The reason for this event.
+    InputEvent input; // This data is specific to keypress data.
+} MyEvent;
+
+typedef enum {
+    MyViewId,
+    MyOtherViewId,
+} ViewId;
+
 FuriMessageQueue* queue;
+ViewId current_view;
 
 static void draw_callback(Canvas* canvas, void* context) {
     UNUSED(context);
@@ -71,19 +68,7 @@ static void input_callback(InputEvent* input_event, void* context) {
     if(input_event->type == InputTypeShort) {
         if(input_event->key == InputKeyBack) {
             // Default back handler.
-            handled = false;
-        } else if(input_event->key == InputKeyLeft) {
-            x--;
-            handled = true;
-        } else if(input_event->key == InputKeyRight) {
-            x++;
-            handled = true;
-        } else if(input_event->key == InputKeyUp) {
-            y--;
-            handled = true;
-        } else if(input_event->key == InputKeyDown) {
-            y++;
-            handled = true;
+            handled = false; 
         } else if(input_event->key == InputKeyOk) {
             // switch the view!
             view_dispatcher_send_custom_event(view_dispatcher, 42);
