@@ -9,19 +9,26 @@
 #include "microvium.h"
 
 // A function in the host (this file) for the VM to call
-#define IMPORT_CONSOLE_LOG 1
 #define IMPORT_CONSOLE_CLEAR 2
+#define IMPORT_CONSOLE_LOG 13
+#define IMPORT_CONSOLE_WARN 19
 
 // A function exported by VM to for the host to call
 const mvm_VMExportID INIT = 1;
+/* Use when needed
+const mvm_VMExportID MAIN = 2;
+*/
 
 mvm_TeError resolveImport(mvm_HostFunctionID id, void*, mvm_TfHostFunction* out);
-mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
+mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
+mvm_TeError console_warn(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 
 typedef enum CON_EVENT {
-    CON_CLEAR, //console.clear();
-    CON_LOG, //console.log();
+    CON_NONE // no event
+    CON_CLEAR, // console.clear();
+    CON_LOG, // console.log();
+    CON_WARN, // console.warn(); shouldn't do anything in draw_callback
 } CON_EVENT;
 
 typedef struct {
@@ -42,7 +49,10 @@ static void draw_callback(Canvas* canvas, void* context) {
         canvas_clear(canvas);
     } else if (console->conEvent == CON_LOG) {
         canvas_draw_str(canvas, console->conX, console->conY, furi_string_get_cstr(console->conLog));
+    } else if (console->conEvent == CON_WARN) {
+        // do nothing
     }
+    console->conEvent = CON_NONE;
 }
 
 static void input_callback(InputEvent* input_event, void* ctx) {
@@ -161,6 +171,17 @@ mvm_TeError resolveImport(mvm_HostFunctionID funcID, void* context, mvm_TfHostFu
     return MVM_E_UNRESOLVED_IMPORT;
 }
 
+mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
+    UNUSED(vm);
+    UNUSED(funcID);
+    UNUSED(result);
+    UNUSED(args);
+    furi_assert(argCount == 0);
+    console->conEvent = CON_CLEAR;
+    view_port_update(view_port);
+    return MVM_E_SUCCESS;
+}
+
 mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
     UNUSED(funcID);
     UNUSED(result);
@@ -173,13 +194,11 @@ mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result
     return MVM_E_SUCCESS;
 }
 
-mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
-    UNUSED(vm);
+mvm_TeError console_warn(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
     UNUSED(funcID);
     UNUSED(result);
-    UNUSED(args);
-    furi_assert(argCount == 0);
-    console->conEvent = CON_CLEAR;
-    view_port_update(view_port);
+    furi_assert(argCount == 1;);
+    FURI_LOG_W("microvium", "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
+    console->conEvent = CON_WARN;
     return MVM_E_SUCCESS;
 }
