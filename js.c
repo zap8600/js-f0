@@ -25,7 +25,7 @@ mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result
 mvm_TeError console_warn(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 
 typedef enum CON_EVENT {
-    CON_NONE // no event
+    CON_NONE, // no event
     CON_CLEAR, // console.clear();
     CON_LOG, // console.log();
     CON_WARN, // console.warn(); shouldn't do anything in draw_callback
@@ -45,7 +45,9 @@ ViewPort* view_port;
 static void draw_callback(Canvas* canvas, void* context) {
     UNUSED(context);
     canvas_set_font(canvas, FontSecondary);
-    if (console->conEvent == CON_CLEAR) {
+    if (console->conEvent == CON_NONE) {
+        // do nothing
+    } else if (console->conEvent == CON_CLEAR) {
         canvas_clear(canvas);
     } else if (console->conEvent == CON_LOG) {
         canvas_draw_str(canvas, console->conX, console->conY, furi_string_get_cstr(console->conLog));
@@ -167,7 +169,7 @@ mvm_TeError resolveImport(mvm_HostFunctionID funcID, void* context, mvm_TfHostFu
     } else if (funcID == IMPORT_CONSOLE_CLEAR) {
         *out = console_clear;
         return MVM_E_SUCCESS;
-    }
+    } else if (funcID == IMPORT_CONSOLE_WARN) {}
     return MVM_E_UNRESOLVED_IMPORT;
 }
 
@@ -197,7 +199,7 @@ mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result
 mvm_TeError console_warn(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
     UNUSED(funcID);
     UNUSED(result);
-    furi_assert(argCount == 1;);
+    furi_assert(argCount == 1);
     FURI_LOG_W("microvium", "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
     console->conEvent = CON_WARN;
     return MVM_E_SUCCESS;
