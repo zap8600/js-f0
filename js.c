@@ -183,7 +183,7 @@ int32_t js_app() {
 
     Gui* gui = furi_record_open(RECORD_GUI);
     view_dispatcher_attach_to_gui(view_dispatcher, gui, ViewDispatcherTypeFullscreen);
-    current_view = MyViewId;
+    current_view = JSMain;
     view_dispatcher_switch_to_view(view_dispatcher, current_view);
 
     console = malloc(sizeof(Console));
@@ -196,8 +196,8 @@ int32_t js_app() {
 
     furi_string_free(console->conLog);
 
-    view_dispatcher_remove_view(view_dispatcher, MyViewId);
-    view_dispatcher_remove_view(view_dispatcher, MyOtherViewId);
+    view_dispatcher_remove_view(view_dispatcher, JSMain);
+    view_dispatcher_remove_view(view_dispatcher, JSConsole);
     furi_record_close(RECORD_GUI);
     view_dispatcher_free(view_dispatcher);
 
