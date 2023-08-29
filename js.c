@@ -53,6 +53,15 @@ typedef enum {
 FuriMessageQueue* queue;
 ViewId current_view;
 
+typedef struct {
+    FuriThread* thread;
+} JSThread;
+
+uint8_t* fileBuff;
+size_t fileSize;
+
+TextBox* text_box;
+
 static void draw_callback(Canvas* canvas, void* context) {
     UNUSED(context);
     canvas_set_font(canvas, FontSecondary);
@@ -109,7 +118,9 @@ static uint32_t exit_console_callback(void* context) {
     return JSMain;
 } 
 
-int32_t js_run(uint8_t* fileBuff, size_t fileSize) {
+int32_t js_run(void* context) {
+    UNUSED(context);
+
     mvm_TeError err;
     mvm_VM* vm;
     mvm_Value init;
@@ -146,9 +157,8 @@ int32_t js_app() {
     Storage* storage = furi_record_open(RECORD_STORAGE);
     File* bytecode = storage_file_alloc(storage);
     storage_file_open(bytecode, EXT_PATH("script.mvm-bc"), FSAM_READ, FSOM_OPEN_EXISTING);
-    size_t fileSize = storage_file_size(bytecode);
+    fileSize = storage_file_size(bytecode);
     FURI_LOG_I("microvium", "File Size: %d", fileSize);
-    uint8_t* fileBuff;
     fileBuff = malloc(fileSize);
     storage_file_read(bytecode, fileBuff, fileSize);
     storage_file_close(bytecode);
@@ -167,7 +177,7 @@ int32_t js_app() {
     view_set_input_callback(view1, input_callback);
     view_set_orientation(view1, ViewOrientationHorizontal);
 
-    TextBox* text_box = text_box_alloc();
+    text_box = text_box_alloc();
     text_box_set_font(text_box, TextBoxFontText);
     view_set_previous_callback(text_box_get_view(text_box), exit_console_callback);
 
@@ -189,19 +199,34 @@ int32_t js_app() {
     console = malloc(sizeof(Console));
     console->conLog = furi_string_alloc();
 
-    js_run(fileBuff, fileSize);
-    text_box_set_text(text_box, furi_string_get_cstr(console->conLog));
+    JSThread* jsThread = malloc(sizeof(JSThread));
+
+    // Setting the name of the FuriThread
+    furi_thread_set_name(jsThread->thread, "Microvium");
+    // Setting the stack size
+    furi_thread_set_stack_size(jsThread->thread, 1024);
+    // Setting the *context
+    furi_thread_set_context(jsThread->thread, jsThread);
+    // Setting the callback - keep in mind that the signature of the function
+    // must be like this : static int32_t thread_body(void* context)
+    furi_thread_set_callback(jsThread->thread, js_run);
+    // Starts the FuriThread !!
+    furi_thread_start(jsThread->thread);
 
     view_dispatcher_run(view_dispatcher);
 
+    furi_thread_join(jsThread->thread);
+    furi_thread_free(jsThread->thread);
+    free(jsThread);
+
     furi_string_free(console->conLog);
+    free(console);
 
     view_dispatcher_remove_view(view_dispatcher, JSMain);
     view_dispatcher_remove_view(view_dispatcher, JSConsole);
     furi_record_close(RECORD_GUI);
     view_dispatcher_free(view_dispatcher);
 
-    free(console);
     return 0;
 }
 
@@ -237,7 +262,7 @@ mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* resu
     // console->conEvent = CON_CLEAR;
     FURI_LOG_I(TAG, "console.clear()\n");
     furi_string_reset(console->conLog);
-    // view_port_update(view_port);
+    text_box_set_text(text_box, furi_string_get_cstr(console->conLog));
     return MVM_E_SUCCESS;
 }
 
@@ -247,12 +272,7 @@ mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result
     furi_assert(argCount == 1); // furi_assert(argCount == 3);
     FURI_LOG_I(TAG, "console.log()\n");
     furi_string_cat_printf(console->conLog, "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
-    /*
-    console->conX = mvm_toInt32(vm, args[1]);
-    console->conY = mvm_toInt32(vm, args[2]);
-    console->conEvent = CON_LOG;
-    */
-    //view_port_update(view_port);
+    text_box_set_text(text_box, furi_string_get_cstr(console->conLog));
     return MVM_E_SUCCESS;
 }
 
