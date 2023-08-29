@@ -57,9 +57,6 @@ typedef struct {
     FuriThread* thread;
 } JSThread;
 
-uint8_t* fileBuff;
-size_t fileSize;
-
 TextBox* text_box;
 
 static void draw_callback(Canvas* canvas, void* context) {
@@ -157,9 +154,9 @@ int32_t js_app() {
     Storage* storage = furi_record_open(RECORD_STORAGE);
     File* bytecode = storage_file_alloc(storage);
     storage_file_open(bytecode, EXT_PATH("script.mvm-bc"), FSAM_READ, FSOM_OPEN_EXISTING);
-    fileSize = storage_file_size(bytecode);
+    size_t fileSize = storage_file_size(bytecode);
     FURI_LOG_I("microvium", "File Size: %d", fileSize);
-    fileBuff = malloc(fileSize);
+    uint8_t* fileBuff = malloc(fileSize);
     storage_file_read(bytecode, fileBuff, fileSize);
     storage_file_close(bytecode);
     storage_file_free(bytecode);
@@ -198,6 +195,8 @@ int32_t js_app() {
 
     console = malloc(sizeof(Console));
     console->conLog = furi_string_alloc();
+
+    FURI_LOG_I(TAG, "Made it to thread!");
 
     JSThread* jsThread = malloc(sizeof(JSThread));
 
