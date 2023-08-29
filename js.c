@@ -105,6 +105,7 @@ bool custom_event_callback(void* context, uint32_t event) {
 }
 
 static uint32_t exit_console_callback(void* context) {
+    UNUSED(context);
     return JSMain;
 } 
 
@@ -177,8 +178,8 @@ int32_t js_app() {
     view_dispatcher_set_custom_event_callback(
         view_dispatcher, custom_event_callback);
     view_dispatcher_enable_queue(view_dispatcher);
-    view_dispatcher_add_view(view_dispatcher, MyViewId, view1);
-    view_dispatcher_add_view(view_dispatcher, MyOtherViewId, text_box_get_view(text_box));
+    view_dispatcher_add_view(view_dispatcher, JSMain, view1);
+    view_dispatcher_add_view(view_dispatcher, JSConsole, text_box_get_view(text_box));
 
     Gui* gui = furi_record_open(RECORD_GUI);
     view_dispatcher_attach_to_gui(view_dispatcher, gui, ViewDispatcherTypeFullscreen);
