@@ -9,24 +9,40 @@
 #include "microvium.h"
 
 // A function in the host (this file) for the VM to call
-#define IMPORT_PRINT 1
+#define IMPORT_CONSOLE_LOG 1
+#define IMPORT_CONSOLE_CLEAR 1
 
 // A function exported by VM to for the host to call
 const mvm_VMExportID INIT = 1;
 
 mvm_TeError resolveImport(mvm_HostFunctionID id, void*, mvm_TfHostFunction* out);
 mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
+mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 
-FuriString* conLog;
-int conY;
-int conX;
+typedef enum CON_EVENT {
+    CON_CLEAR, //console.clear();
+    CON_LOG, //console.log();
+} CON_EVENT;
+
+typedef struct {
+    FuriString* conLog;
+    int conY;
+    int conX;
+    CON_EVENT conEvent;
+} Console;
+
+Console* console;
 
 ViewPort* view_port;
 
 static void draw_callback(Canvas* canvas, void* context) {
     UNUSED(context);
     canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str(canvas, conX, conY, furi_string_get_cstr(conLog));
+    if (console->conEvent == CON_CLEAR) {
+        canvas_clear(canvas);
+    } else if (console->conEvent == CON_LOG) {
+        canvas_draw_str(canvas, console->conX, console->conY, furi_string_get_cstr(console->conLog));
+    }
 }
 
 static void input_callback(InputEvent* input_event, void* ctx) {
@@ -92,7 +108,8 @@ int32_t js_app() {
     Gui* gui = furi_record_open(RECORD_GUI);
     gui_add_view_port(gui, view_port, GuiLayerFullscreen);
 
-    conLog = furi_string_alloc();
+    console = malloc(sizeof(Console));
+    console->conLog = furi_string_alloc();
 
     while(1) {
         furi_check(furi_message_queue_get(event_queue, &event, FuriWaitForever) == FuriStatusOk);
@@ -110,12 +127,14 @@ int32_t js_app() {
         }
     }
 
-    furi_string_free(conLog);
+    furi_string_free(console->conLog);
 
     furi_message_queue_free(event_queue);
     gui_remove_view_port(gui, view_port);
     view_port_free(view_port);
     furi_record_close(RECORD_GUI);
+
+    free(console);
     return 0;
 }
 
@@ -132,9 +151,12 @@ void fatalError(void* vm, int e) {
  */
 mvm_TeError resolveImport(mvm_HostFunctionID funcID, void* context, mvm_TfHostFunction* out) {
     UNUSED(context);
-    if (funcID == IMPORT_PRINT) {
-      *out = print;
+    if (funcID == IMPORT_CONSOLE_LOG) {
+      *out = console_log;
       return MVM_E_SUCCESS;
+    } else if (funcID == IMPORT_CONSOLE_CLEAR) {
+        *out = console_clear;
+        return MVM_E_SUCCESS;
     }
     return MVM_E_UNRESOLVED_IMPORT;
 }
@@ -143,17 +165,20 @@ mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result
     UNUSED(funcID);
     UNUSED(result);
     furi_assert(argCount == 3);
-    furi_string_printf(conLog, "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
-    conX = mvm_toInt32(vm, args[1]);
-    conY = mvm_toInt32(vm, args[2]);
+    furi_string_printf(console->conLog, "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
+    console->conX = mvm_toInt32(vm, args[1]);
+    console->conY = mvm_toInt32(vm, args[2]);
+    console->conEvent = CON_LOG;
     view_port_update(view_port);
     return MVM_E_SUCCESS;
 }
 
 mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
+    UNUSED(vm);
     UNUSED(funcID);
     UNUSED(result);
     UNUSED(args);
     furi_assert(argCount == 0);
-    canvas
+    console->conEvent = CON_CLEAR;
+    view_port_update(view_port);
 }
