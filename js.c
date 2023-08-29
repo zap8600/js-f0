@@ -4,7 +4,9 @@
 #include <assert.h>
 #include <furi.h>
 #include <gui/gui.h>
-#include <gui/elements.h>
+#include <gui/view_dispatcher.h>
+#include <gui/view.h>
+#include <gui/modules/text_box.h>
 #include <storage/storage.h>
 
 #include "microvium.h"
@@ -51,32 +53,72 @@ typedef struct {
 
 Console* console;
 
-ViewPort* view_port;
+ViewId current_view;
+FuriMessageQueue* queue;
 
 static void draw_callback(Canvas* canvas, void* context) {
     UNUSED(context);
     canvas_set_font(canvas, FontSecondary);
-    canvas_draw_frame(canvas, 0, 0, 128, 64);
-    elements_text_box(canvas, 0, 0, 128, 64, AlignLeft, AlignTop, furi_string_get_cstr(console->conLog), true); // furi_string_get_cstr(console->conLog)
-    /*
-    if (console->conEvent == CON_NONE) {
-        // do nothing
-    } else if (console->conEvent == CON_CLEAR) {
-        canvas_clear(canvas);
-        canvas_draw_frame(canvas, 0, 0, 128, 22);
-    } else if (console->conEvent == CON_LOG) {
-        canvas_draw_str(canvas, console->conX, console->conY, furi_string_get_cstr(console->conLog));
-    } else if (console->conEvent == CON_WARN) {
-        // do nothing
-    }
-    console->conEvent = CON_NONE;
-    */
+    canvas_draw_str(canvas, 5, 30, "Hello world");
 }
 
-static void input_callback(InputEvent* input_event, void* ctx) {
-    furi_assert(ctx);
-    FuriMessageQueue* event_queue = ctx;
-    furi_message_queue_put(event_queue, input_event, FuriWaitForever);
+static void input_callback(InputEvent* input_event, void* context) {
+    furi_assert(context);
+    bool handled = false;
+    // we set our callback context to be the view_dispatcher.
+    ViewDispatcher* view_dispatcher = context;
+
+    if(input_event->type == InputTypeShort) {
+        if(input_event->key == InputKeyBack) {
+            // Default back handler.
+            handled = false;
+        } else if(input_event->key == InputKeyLeft) {
+            x--;
+            handled = true;
+        } else if(input_event->key == InputKeyRight) {
+            x++;
+            handled = true;
+        } else if(input_event->key == InputKeyUp) {
+            y--;
+            handled = true;
+        } else if(input_event->key == InputKeyDown) {
+            y++;
+            handled = true;
+        } else if(input_event->key == InputKeyOk) {
+            // switch the view!
+            view_dispatcher_send_custom_event(view_dispatcher, 42);
+            handled = true;
+        }
+    }
+
+    return handled;
+}
+
+bool navigation_event_callback(void* context) {
+    UNUSED(context);
+    // We did not handle the event, so return false.
+    return false;
+}
+
+bool custom_event_callback(void* context, uint32_t event) {
+    furi_assert(context);
+    bool handled = false;
+    // we set our callback context to be the view_dispatcher.
+    ViewDispatcher* view_dispatcher = context;
+
+    if(event == 42) {
+        if(current_view == MyViewId) {
+            current_view = MyOtherViewId;
+        } else {
+            current_view = MyViewId;
+        }
+
+        view_dispatcher_switch_to_view(view_dispatcher, current_view);
+        handled = true;
+    }
+
+    // NOTE: The return value is not currently used by the ViewDispatcher.
+    return handled;
 }
 
 int32_t js_run(uint8_t* fileBuff, size_t fileSize) {
@@ -113,9 +155,6 @@ int32_t js_run(uint8_t* fileBuff, size_t fileSize) {
 }
 
 int32_t js_app() {
-    InputEvent event;
-    FuriMessageQueue* event_queue = furi_message_queue_alloc(8, sizeof(InputEvent));
-
     Storage* storage = furi_record_open(RECORD_STORAGE);
     File* bytecode = storage_file_alloc(storage);
     storage_file_open(bytecode, EXT_PATH("script.mvm-bc"), FSAM_READ, FSOM_OPEN_EXISTING);
@@ -129,38 +168,49 @@ int32_t js_app() {
 
     furi_record_close(RECORD_STORAGE);
 
-    view_port = view_port_alloc();
-    view_port_draw_callback_set(view_port, draw_callback, NULL);
-    view_port_input_callback_set(view_port, input_callback, event_queue);
+    ViewDispatcher* view_dispatcher = view_dispatcher_alloc();
+
+    // For this demo, we just use view_dispatcher as our application context.
+    void* context = view_dispatcher;
+
+    View* view1 = view_alloc();
+    view_set_context(view1, context);
+    view_set_draw_callback(view1, draw_callback);
+    view_set_input_callback(view1, input_callback);
+    view_set_orientation(view1, ViewOrientationHorizontal);
+
+    TextBox* text_box = text_box_alloc();
+    text_box_set_font(text_box, TextBoxFontText);
+
+    // set param 1 of custom event callback (impacts tick and navigation too).
+    view_dispatcher_set_event_callback_context(view_dispatcher, context);
+    view_dispatcher_set_navigation_event_callback(
+        view_dispatcher, navigation_event_callback);
+    view_dispatcher_set_custom_event_callback(
+        view_dispatcher, custom_event_callback);
+    view_dispatcher_enable_queue(view_dispatcher);
+    view_dispatcher_add_view(view_dispatcher, MyViewId, view1);
+    view_dispatcher_add_view(view_dispatcher, MyOtherViewId, text_box_get_view(text_box));
 
     Gui* gui = furi_record_open(RECORD_GUI);
-    gui_add_view_port(gui, view_port, GuiLayerFullscreen);
+    view_dispatcher_attach_to_gui(view_dispatcher, gui, ViewDispatcherTypeFullscreen);
+    current_view = MyViewId;
+    view_dispatcher_switch_to_view(view_dispatcher, current_view);
 
     console = malloc(sizeof(Console));
     console->conLog = furi_string_alloc();
 
-    while(1) {
-        furi_check(furi_message_queue_get(event_queue, &event, FuriWaitForever) == FuriStatusOk);
-        if(event.key == InputKeyOk) {
-            js_run(fileBuff, fileSize);
-            break;
-        }
-    }
-    furi_delay_ms(500);
+    js_run(fileBuff, fileSize);
+    text_box_set_text(text_box, furi_string_get_cstr(console->conLog));
 
-    while(1) {
-        furi_check(furi_message_queue_get(event_queue, &event, FuriWaitForever) == FuriStatusOk);
-        if(event.key == InputKeyBack) {
-            break;
-        }
-    }
+    view_dispatcher_run(view_dispatcher);
 
     furi_string_free(console->conLog);
 
-    furi_message_queue_free(event_queue);
-    gui_remove_view_port(gui, view_port);
-    view_port_free(view_port);
+    view_dispatcher_remove_view(view_dispatcher, MyViewId);
+    view_dispatcher_remove_view(view_dispatcher, MyOtherViewId);
     furi_record_close(RECORD_GUI);
+    view_dispatcher_free(view_dispatcher);
 
     free(console);
     return 0;
@@ -198,7 +248,7 @@ mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* resu
     // console->conEvent = CON_CLEAR;
     FURI_LOG_I(TAG, "console.clear()\n");
     furi_string_reset(console->conLog);
-    view_port_update(view_port);
+    // view_port_update(view_port);
     return MVM_E_SUCCESS;
 }
 
@@ -207,13 +257,13 @@ mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result
     UNUSED(result);
     furi_assert(argCount == 1); // furi_assert(argCount == 3);
     FURI_LOG_I(TAG, "console.log()\n");
-    furi_string_cat_printf(console->conLog, "%s", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
+    furi_string_cat_printf(console->conLog, "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
     /*
     console->conX = mvm_toInt32(vm, args[1]);
     console->conY = mvm_toInt32(vm, args[2]);
     console->conEvent = CON_LOG;
     */
-    view_port_update(view_port);
+    //view_port_update(view_port);
     return MVM_E_SUCCESS;
 }
 
