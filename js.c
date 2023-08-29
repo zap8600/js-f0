@@ -222,8 +222,8 @@ mvm_TeError console_warn(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* resul
     UNUSED(funcID);
     UNUSED(result);
     furi_assert(argCount == 1);
-    FURI_LOG_I(TAG, "console.warn()")
-    FURI_LOG_I(TAG, "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
+    FURI_LOG_I(TAG, "console.warn()");
+    FURI_LOG_W(TAG, "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
     // console->conEvent = CON_WARN;
     return MVM_E_SUCCESS;
 }
