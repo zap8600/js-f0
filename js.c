@@ -54,6 +54,8 @@ FuriMessageQueue* queue;
 ViewId current_view;
 
 typedef struct {
+    size_t fileSize;
+    uint8_t* fileBuff;
     FuriThread* thread;
 } JSThread;
 
@@ -116,7 +118,7 @@ static uint32_t exit_console_callback(void* context) {
 } 
 
 int32_t js_run(void* context) {
-    UNUSED(context);
+    JSThread* jsThread = (JSThread*)context;
 
     mvm_TeError err;
     mvm_VM* vm;
@@ -124,7 +126,7 @@ int32_t js_run(void* context) {
     mvm_Value result;
 
     // Restore the VM from the snapshot
-    err = mvm_restore(&vm, fileBuff, fileSize, NULL, resolveImport);
+    err = mvm_restore(&vm, jsThread->fileBuff, jsThread->fileSize, NULL, resolveImport);
     if (err != MVM_E_SUCCESS) {
         FURI_LOG_E(TAG, "Error with restore: %d", err);
         return err;
@@ -199,6 +201,10 @@ int32_t js_app() {
     FURI_LOG_I(TAG, "Made it to thread!");
 
     JSThread* jsThread = malloc(sizeof(JSThread));
+
+    jsThread->fileSize = fileSize;
+    jsThread->fileBuff = malloc(fileSize);
+    jsThread->fileBuff = fileBuff;
 
     // Setting the name of the FuriThread
     furi_thread_set_name(jsThread->thread, "Microvium");

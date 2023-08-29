@@ -3,7 +3,7 @@ App(
     name="JavaScript",
     apptype=FlipperAppType.EXTERNAL,
     entry_point="js_app",
-    stack_size=1 * 1024,
+    stack_size=4 * 1024,
     requires=["gui"],
     fap_private_libs=[
         Lib(
