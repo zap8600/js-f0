@@ -181,4 +181,5 @@ mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* resu
     furi_assert(argCount == 0);
     console->conEvent = CON_CLEAR;
     view_port_update(view_port);
+    return MVM_E_SUCCESS;
 }
