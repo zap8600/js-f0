@@ -207,7 +207,7 @@ mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result
     UNUSED(result);
     furi_assert(argCount == 1); // furi_assert(argCount == 3);
     FURI_LOG_I(TAG, "console.log()\n");
-    furi_string_printf(console->conLog, "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
+    furi_string_printf(console->conLog, "%s", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
     /*
     console->conX = mvm_toInt32(vm, args[1]);
     console->conY = mvm_toInt32(vm, args[2]);
