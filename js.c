@@ -10,7 +10,7 @@
 
 // A function in the host (this file) for the VM to call
 #define IMPORT_CONSOLE_LOG 1
-#define IMPORT_CONSOLE_CLEAR 1
+#define IMPORT_CONSOLE_CLEAR 2
 
 // A function exported by VM to for the host to call
 const mvm_VMExportID INIT = 1;
