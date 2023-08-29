@@ -59,7 +59,7 @@ static void draw_callback(Canvas* canvas, void* context) {
     canvas_draw_str(canvas, 5, 30, "Hello world");
 }
 
-static void input_callback(InputEvent* input_event, void* context) {
+static bool input_callback(InputEvent* input_event, void* context) {
     furi_assert(context);
     bool handled = false;
     // we set our callback context to be the view_dispatcher.
