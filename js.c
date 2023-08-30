@@ -78,9 +78,9 @@ typedef enum {
 typedef struct {
     CEvent cEvent;
     Font font;
-    char str[16];
+    const char* str;
     int x;
-    iny y;
+    int y;
 } Display;
 
 Display* display;
@@ -301,8 +301,11 @@ mvm_TeError flipper_canvas_draw_str(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_V
     UNUSED(result);
     furi_assert(argCount == 3);
     FURI_LOG_I(TAG, "canvas_draw_str()");
+    display->x = (int32_t)mvm_toInt32(vm, args[0]);
+    display->y = (int32_t)mvm_toInt32(vm, args[1]);
     display->str = (const char*)mvm_toStringUtf8(vm, args[2], NULL);
-    display->x = (int32_t)mvm_toInt32()
+    display->cEvent = CDrawStr;
+    return MVM_E_SUCCESS;
 }
 
 mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
