@@ -14,7 +14,7 @@
 
 #define TAG "microvium"
 
-static int32_t js_run(uint8_t* fileBuff, size_t fileSize);
+static int32_t js_run(void* context);
 
 // A function in the host (this file) for the VM to call
 #define IMPORT_CONSOLE_CLEAR 1
