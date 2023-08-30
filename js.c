@@ -62,6 +62,11 @@ ViewDispatcher* view_dispatcher;
 
 TextBox* text_box;
 
+typedef struct {
+    FuriThread* thread;
+    uint8_t* fileBuff;
+} JSRtThread;
+
 /*
 bool confirmGot = false;
 bool confirmResult = false;
@@ -137,14 +142,16 @@ void confirm_callback(DialogExResult result, void* context) {
 }
 */
 
-static int32_t js_run(uint8_t* fileBuff, size_t fileSize) {
+static int32_t js_run(void* context) {
+    JSRtThread* jsThread = (JSRtThread*)context;
+
     mvm_TeError err;
     mvm_VM* vm;
     mvm_Value init;
     mvm_Value result;
 
     // Restore the VM from the snapshot
-    err = mvm_restore(&vm, fileBuff, fileSize, NULL, resolveImport);
+    err = mvm_restore(&vm, jsThread->fileBuff, sizeof(jsThread->fileBuff), NULL, resolveImport);
     if (err != MVM_E_SUCCESS) {
         FURI_LOG_E(TAG, "Error with restore: %d", err);
         return err;
@@ -171,13 +178,17 @@ static int32_t js_run(uint8_t* fileBuff, size_t fileSize) {
 }
 
 int32_t js_app() {
+    JSRtThread* jsThread = malloc(sizeof(JSRtThread));
+
+    jsThread->thread = furi_thread_alloc_ex("microium", 1024, js_run, jsThread);
+
     Storage* storage = furi_record_open(RECORD_STORAGE);
     File* bytecode = storage_file_alloc(storage);
     storage_file_open(bytecode, EXT_PATH("script.mvm-bc"), FSAM_READ, FSOM_OPEN_EXISTING);
     size_t fileSize = storage_file_size(bytecode);
     FURI_LOG_I("microvium", "File Size: %d", fileSize);
-    uint8_t* fileBuff = malloc(fileSize);
-    storage_file_read(bytecode, fileBuff, fileSize);
+    jsThread->fileBuff = malloc(fileSize);
+    storage_file_read(bytecode, jsThread->fileBuff, fileSize);
     storage_file_close(bytecode);
     storage_file_free(bytecode);
 
@@ -225,10 +236,17 @@ int32_t js_app() {
     console = malloc(sizeof(Console));
     console->conLog = furi_string_alloc();
 
+    /*
     js_run(fileBuff, fileSize);
     text_box_set_text(text_box, furi_string_get_cstr(console->conLog));
+    */
 
+    furi_thread_start(jsThread->thread);
     view_dispatcher_run(view_dispatcher);
+
+    furi_thread_join(jsThread->thread);
+    furi_thread_free(jsThread->thread);
+    free(jsThread);
 
     furi_string_free(console->conLog);
     free(console);
@@ -294,6 +312,7 @@ mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* resu
     // console->conEvent = CON_CLEAR;
     FURI_LOG_I(TAG, "console.clear()\n");
     furi_string_reset(console->conLog);
+    text_box_set_text(text_box, furi_string_get_cstr(console->conLog));
     return MVM_E_SUCCESS;
 }
 
@@ -303,6 +322,7 @@ mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result
     furi_assert(argCount == 1); // furi_assert(argCount == 3);
     FURI_LOG_I(TAG, "console.log()\n");
     furi_string_cat_printf(console->conLog, "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
+    text_box_set_text(text_box, furi_string_get_cstr(console->conLog));
     return MVM_E_SUCCESS;
 }
 
