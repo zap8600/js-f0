@@ -226,7 +226,8 @@ int32_t js_app() {
     console = malloc(sizeof(Console));
     console->conLog = furi_string_alloc();
 
-    //js_run(fileBuff, fileSize);
+    js_run(fileBuff, fileSize);
+    text_box_set_text(text_box, furi_string_get_cstr(console->conLog));
 
     view_dispatcher_run(view_dispatcher);
 
@@ -235,8 +236,8 @@ int32_t js_app() {
 
     view_dispatcher_remove_view(view_dispatcher, JSMain);
     view_dispatcher_remove_view(view_dispatcher, JSConsole);
-    view_dispatcher_remove_view(view_dispatcher, JSConfirm);
-    //furi_record_close(RECORD_GUI);
+    // view_dispatcher_remove_view(view_dispatcher, JSConfirm);
+    furi_record_close(RECORD_GUI);
     view_dispatcher_free(view_dispatcher);
 
     return 0;
