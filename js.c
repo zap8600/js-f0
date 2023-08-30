@@ -17,9 +17,11 @@
 static int32_t js_run(void* context);
 
 // A function in the host (this file) for the VM to call
-#define IMPORT_CONSOLE_CLEAR 1
-#define IMPORT_CONSOLE_LOG 2
-#define IMPORT_CONSOLE_WARN 3
+#define IMPORT_FLIPPER_CANVAS_SET_FONT 1
+#define IMPORT_FLIPPER_CANVAS_DRAW_STR 2
+#define IMPORT_CONSOLE_CLEAR 3
+#define IMPORT_CONSOLE_LOG 4
+#define IMPORT_CONSOLE_WARN 5
 
 // A function exported by VM to for the host to call
 const mvm_VMExportID INIT = 1;
@@ -28,16 +30,11 @@ const mvm_VMExportID MAIN = 2;
 */
 
 mvm_TeError resolveImport(mvm_HostFunctionID id, void*, mvm_TfHostFunction* out);
-// mvm_TeError confirm(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
+mvm_TeError flipper_canvas_set_font(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
+mvm_TeError flipper_canvas_draw_str(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError console_warn(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
-
-typedef struct {
-    FuriString* conLog;
-} Console;
-
-Console* console;
 
 typedef enum {
     MyEventTypeKey,
@@ -50,7 +47,7 @@ typedef struct {
 } MyEvent;
 
 typedef enum {
-    JSMain,
+    JSDisplay,
     JSConsole,
     //JSConfirm,
 } ViewId;
@@ -66,13 +63,23 @@ typedef struct {
     FuriThread* thread;
 } JSRtThread;
 
+typedef struct {
+    FuriString* conLog;
+} Console;
+
+Console* console;
+
+typedef enum {
+    CSetFont,
+    CDrawStr,
+} CEvent;
+
+typedef struct {
+    Font font;
+} Display;
+
 size_t fileSize;
 uint8_t* fileBuff;
-
-/*
-bool confirmGot = false;
-bool confirmResult = false;
-*/
 
 static void draw_callback(Canvas* canvas, void* context) {
     UNUSED(context);
@@ -106,17 +113,15 @@ bool navigation_event_callback(void* context) {
 }
 
 bool custom_event_callback(void* context, uint32_t event) {
-    furi_assert(context);
+    UNUSED(context);
     bool handled = false;
-    // we set our callback context to be the view_dispatcher.
-    ViewDispatcher* view_dispatcher_c = context;
 
     if(event == 42) {
-        if(current_view == JSMain) {
+        if(current_view == JSDisplay) {
             current_view = JSConsole;
         }
 
-        view_dispatcher_switch_to_view(view_dispatcher_c, current_view);
+        view_dispatcher_switch_to_view(view_dispatcher, current_view);
         handled = true;
     }
 
@@ -126,23 +131,8 @@ bool custom_event_callback(void* context, uint32_t event) {
 
 static uint32_t exit_console_callback(void* context) {
     UNUSED(context);
-    return JSMain;
+    return JSDisplay;
 } 
-
-/*
-void confirm_callback(DialogExResult result, void* context) {
-    UNUSED(context);
-    if (result == DialogExResultLeft) {
-        confirmGot = true;
-        confirmResult = false;
-    } else if (result == DialogExResultRight) {
-        confirmGot = true;
-        confirmResult = true;
-    }
-    current_view = JSMain;
-    view_dispatcher_switch_to_view(view_dispatcher, current_view);
-}
-*/
 
 static int32_t js_run(void* context) {
     UNUSED(context);
@@ -210,14 +200,6 @@ int32_t js_app() {
     text_box_set_font(text_box, TextBoxFontText);
     view_set_previous_callback(text_box_get_view(text_box), exit_console_callback);
 
-    /*
-    DialogEx* dialog_ex = dialog_ex_alloc();
-    dialog_ex_set_context(dialog_ex, context);
-    dialog_ex_set_result_callback(dialog_ex, confirm_callback);
-    dialog_ex_set_left_button_text(dialog_ex, "No");
-    dialog_ex_set_right_button_text(dialog_ex, "Yes");
-    */
-
     // set param 1 of custom event callback (impacts tick and navigation too).
     view_dispatcher_set_event_callback_context(view_dispatcher, context);
     view_dispatcher_set_navigation_event_callback(
@@ -225,22 +207,16 @@ int32_t js_app() {
     view_dispatcher_set_custom_event_callback(
         view_dispatcher, custom_event_callback);
     view_dispatcher_enable_queue(view_dispatcher);
-    view_dispatcher_add_view(view_dispatcher, JSMain, view1);
+    view_dispatcher_add_view(view_dispatcher, JSDisplay, view1);
     view_dispatcher_add_view(view_dispatcher, JSConsole, text_box_get_view(text_box));
-    //view_dispatcher_add_view(view_dispatcher, JSConfirm, dialog_ex_get_view(dialog_ex));
 
     Gui* gui = furi_record_open(RECORD_GUI);
     view_dispatcher_attach_to_gui(view_dispatcher, gui, ViewDispatcherTypeFullscreen);
-    current_view = JSMain;
+    current_view = JSDisplay;
     view_dispatcher_switch_to_view(view_dispatcher, current_view);
 
     console = malloc(sizeof(Console));
     console->conLog = furi_string_alloc();
-
-    /*
-    js_run(fileBuff, fileSize);
-    text_box_set_text(text_box, furi_string_get_cstr(console->conLog));
-    */
 
     furi_thread_start(jsThread->thread);
     view_dispatcher_run(view_dispatcher);
@@ -252,9 +228,8 @@ int32_t js_app() {
     furi_string_free(console->conLog);
     free(console);
 
-    view_dispatcher_remove_view(view_dispatcher, JSMain);
+    view_dispatcher_remove_view(view_dispatcher, JSDisplay);
     view_dispatcher_remove_view(view_dispatcher, JSConsole);
-    // view_dispatcher_remove_view(view_dispatcher, JSConfirm);
     furi_record_close(RECORD_GUI);
     view_dispatcher_free(view_dispatcher);
 
@@ -284,25 +259,12 @@ mvm_TeError resolveImport(mvm_HostFunctionID funcID, void* context, mvm_TfHostFu
     return MVM_E_UNRESOLVED_IMPORT;
 }
 
-/*
-mvm_TeError confirm(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
+mvm_TeError flipper_canvas_set_font(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
     UNUSED(vm);
     UNUSED(funcID);
     UNUSED(result);
-    UNUSED(args);
-    furi_assert(argCount == 0);
-    current_view = JSConfirm;
-    view_dispatcher_switch_to_view(view_dispatcher, JSConfirm);
-    while (!confirmGot) {}
-    if(confirmResult) {
-        FURI_LOG_I(TAG, "confirm(): Yes");
-    } else if (!confirmResult) {
-        FURI_LOG_I(TAG, "confirm(): No");
-    }
-    confirmGot = false;
-    return MVM_E_SUCCESS;
+    furi_assert(argCount == 1);
 }
-*/
 
 mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
     UNUSED(vm);
@@ -310,7 +272,6 @@ mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* resu
     UNUSED(result);
     UNUSED(args);
     furi_assert(argCount == 0);
-    // console->conEvent = CON_CLEAR;
     FURI_LOG_I(TAG, "console.clear()\n");
     furi_string_reset(console->conLog);
     text_box_set_text(text_box, furi_string_get_cstr(console->conLog));
@@ -320,7 +281,7 @@ mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* resu
 mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
     UNUSED(funcID);
     UNUSED(result);
-    furi_assert(argCount == 1); // furi_assert(argCount == 3);
+    furi_assert(argCount == 1);
     FURI_LOG_I(TAG, "console.log()\n");
     furi_string_cat_printf(console->conLog, "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
     text_box_set_text(text_box, furi_string_get_cstr(console->conLog));
@@ -333,6 +294,5 @@ mvm_TeError console_warn(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* resul
     furi_assert(argCount == 1);
     FURI_LOG_I(TAG, "console.warn()");
     FURI_LOG_W(TAG, "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
-    // console->conEvent = CON_WARN;
     return MVM_E_SUCCESS;
 }
