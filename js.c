@@ -193,10 +193,6 @@ int32_t js_app() {
 
     view_dispatcher_run(view_dispatcher);
 
-    furi_thread_join(jsThread->thread);
-    furi_thread_free(jsThread->thread);
-    free(jsThread);
-
     furi_string_free(console->conLog);
     free(console);
 
