@@ -14,6 +14,8 @@
 
 #define TAG "microvium"
 
+static int32_t js_run(uint8_t* fileBuff, size_t fileSize);
+
 // A function in the host (this file) for the VM to call
 #define IMPORT_CONSOLE_CLEAR 1
 #define IMPORT_CONSOLE_LOG 2
@@ -26,7 +28,7 @@ const mvm_VMExportID MAIN = 2;
 */
 
 mvm_TeError resolveImport(mvm_HostFunctionID id, void*, mvm_TfHostFunction* out);
-mvm_TeError confirm(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
+// mvm_TeError confirm(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError console_warn(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
@@ -50,7 +52,7 @@ typedef struct {
 typedef enum {
     JSMain,
     JSConsole,
-    JSConfirm,
+    //JSConfirm,
 } ViewId;
 
 FuriMessageQueue* queue;
@@ -60,8 +62,10 @@ ViewDispatcher* view_dispatcher;
 
 TextBox* text_box;
 
+/*
 bool confirmGot = false;
 bool confirmResult = false;
+*/
 
 static void draw_callback(Canvas* canvas, void* context) {
     UNUSED(context);
@@ -82,10 +86,6 @@ static bool input_callback(InputEvent* input_event, void* context) {
         } else if(input_event->key == InputKeyOk) {
             // switch the view!
             view_dispatcher_send_custom_event(view_dispatcher, 42);
-            handled = true;
-        } else if (input_event->key == InputKeyUp) {
-            js_run(fileBuff, sizeof(fileBuff));
-            text_box_set_text(text_box, furi_string_get_cstr(console->conLog));
             handled = true;
         }
     }
@@ -123,6 +123,7 @@ static uint32_t exit_console_callback(void* context) {
     return JSMain;
 } 
 
+/*
 void confirm_callback(DialogExResult result, void* context) {
     UNUSED(context);
     if (result == DialogExResultLeft) {
@@ -135,8 +136,9 @@ void confirm_callback(DialogExResult result, void* context) {
     current_view = JSMain;
     view_dispatcher_switch_to_view(view_dispatcher, current_view);
 }
+*/
 
-int32_t js_run(uint8_t* fileBuff, size_t fileSize) {
+static int32_t js_run(uint8_t* fileBuff, size_t fileSize) {
     mvm_TeError err;
     mvm_VM* vm;
     mvm_Value init;
@@ -197,11 +199,13 @@ int32_t js_app() {
     text_box_set_font(text_box, TextBoxFontText);
     view_set_previous_callback(text_box_get_view(text_box), exit_console_callback);
 
+    /*
     DialogEx* dialog_ex = dialog_ex_alloc();
     dialog_ex_set_context(dialog_ex, context);
     dialog_ex_set_result_callback(dialog_ex, confirm_callback);
     dialog_ex_set_left_button_text(dialog_ex, "No");
     dialog_ex_set_right_button_text(dialog_ex, "Yes");
+    */
 
     // set param 1 of custom event callback (impacts tick and navigation too).
     view_dispatcher_set_event_callback_context(view_dispatcher, context);
@@ -212,7 +216,7 @@ int32_t js_app() {
     view_dispatcher_enable_queue(view_dispatcher);
     view_dispatcher_add_view(view_dispatcher, JSMain, view1);
     view_dispatcher_add_view(view_dispatcher, JSConsole, text_box_get_view(text_box));
-    view_dispatcher_add_view(view_dispatcher, JSConfirm, dialog_ex_get_view(dialog_ex));
+    //view_dispatcher_add_view(view_dispatcher, JSConfirm, dialog_ex_get_view(dialog_ex));
 
     Gui* gui = furi_record_open(RECORD_GUI);
     view_dispatcher_attach_to_gui(view_dispatcher, gui, ViewDispatcherTypeFullscreen);
@@ -232,7 +236,7 @@ int32_t js_app() {
     view_dispatcher_remove_view(view_dispatcher, JSMain);
     view_dispatcher_remove_view(view_dispatcher, JSConsole);
     view_dispatcher_remove_view(view_dispatcher, JSConfirm);
-    furi_record_close(RECORD_GUI);
+    //furi_record_close(RECORD_GUI);
     view_dispatcher_free(view_dispatcher);
 
     return 0;
@@ -261,6 +265,7 @@ mvm_TeError resolveImport(mvm_HostFunctionID funcID, void* context, mvm_TfHostFu
     return MVM_E_UNRESOLVED_IMPORT;
 }
 
+/*
 mvm_TeError confirm(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
     UNUSED(vm);
     UNUSED(funcID);
@@ -278,6 +283,7 @@ mvm_TeError confirm(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mv
     confirmGot = false;
     return MVM_E_SUCCESS;
 }
+*/
 
 mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
     UNUSED(vm);
