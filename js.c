@@ -7,6 +7,7 @@
 #include <gui/view_dispatcher.h>
 #include <gui/view.h>
 #include <gui/modules/text_box.h>
+#include <gui/modules/dialog_ex.h>
 #include <storage/storage.h>
 
 #include "microvium.h"
@@ -25,6 +26,7 @@ const mvm_VMExportID MAIN = 2;
 */
 
 mvm_TeError resolveImport(mvm_HostFunctionID id, void*, mvm_TfHostFunction* out);
+mvm_TeError confirm(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError console_warn(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
@@ -48,10 +50,16 @@ typedef struct {
 typedef enum {
     JSMain,
     JSConsole,
+    JSConfirm,
 } ViewId;
 
 FuriMessageQueue* queue;
 ViewId current_view;
+
+ViewDispatcher* view_dispatcher;
+
+bool confirmGot = false;
+bool confirmResult = false;
 
 static void draw_callback(Canvas* canvas, void* context) {
     UNUSED(context);
@@ -63,7 +71,7 @@ static bool input_callback(InputEvent* input_event, void* context) {
     furi_assert(context);
     bool handled = false;
     // we set our callback context to be the view_dispatcher.
-    ViewDispatcher* view_dispatcher = context;
+    uint8_t* fileBuff = context;
 
     if(input_event->type == InputTypeShort) {
         if(input_event->key == InputKeyBack) {
@@ -72,6 +80,9 @@ static bool input_callback(InputEvent* input_event, void* context) {
         } else if(input_event->key == InputKeyOk) {
             // switch the view!
             view_dispatcher_send_custom_event(view_dispatcher, 42);
+            handled = true;
+        } else if (input_event->key == InputKeyUp) {
+            js_run(fileBuff, sizeof(fileBuff));
             handled = true;
         }
     }
@@ -89,14 +100,14 @@ bool custom_event_callback(void* context, uint32_t event) {
     furi_assert(context);
     bool handled = false;
     // we set our callback context to be the view_dispatcher.
-    ViewDispatcher* view_dispatcher = context;
+    ViewDispatcher* view_dispatcher_c = context;
 
     if(event == 42) {
         if(current_view == JSMain) {
             current_view = JSConsole;
         }
 
-        view_dispatcher_switch_to_view(view_dispatcher, current_view);
+        view_dispatcher_switch_to_view(view_dispatcher_c, current_view);
         handled = true;
     }
 
@@ -108,6 +119,19 @@ static uint32_t exit_console_callback(void* context) {
     UNUSED(context);
     return JSMain;
 } 
+
+void confirm_callback(DialogExResult result, void* context) {
+    UNUSED(context);
+    if (result == DialogExResultLeft) {
+        confirmGot = true;
+        confirmResult = false;
+    } else if (result == DialogExResultRight) {
+        confirmGot = true;
+        confirmResult = true;
+    }
+    current_view = JSMain;
+    view_dispatcher_switch_to_view(view_dispatcher, current_view);
+}
 
 int32_t js_run(uint8_t* fileBuff, size_t fileSize) {
     mvm_TeError err;
@@ -155,13 +179,13 @@ int32_t js_app() {
 
     furi_record_close(RECORD_STORAGE);
 
-    ViewDispatcher* view_dispatcher = view_dispatcher_alloc();
+    view_dispatcher = view_dispatcher_alloc();
 
     // For this demo, we just use view_dispatcher as our application context.
     void* context = view_dispatcher;
 
     View* view1 = view_alloc();
-    view_set_context(view1, context);
+    view_set_context(view1, fileBuff);
     view_set_draw_callback(view1, draw_callback);
     view_set_input_callback(view1, input_callback);
     view_set_orientation(view1, ViewOrientationHorizontal);
@@ -169,6 +193,12 @@ int32_t js_app() {
     TextBox* text_box = text_box_alloc();
     text_box_set_font(text_box, TextBoxFontText);
     view_set_previous_callback(text_box_get_view(text_box), exit_console_callback);
+
+    DialogEx* dialog_ex = dialog_ex_alloc();
+    dialog_ex_set_context(dialog_ex, context);
+    dialog_ex_set_result_callback(dialog_ex, confirm_callback);
+    dialog_ex_set_left_button_text(dialog_ex, "No");
+    dialog_ex_set_right_button_text(dialog_ex, "Yes");
 
     // set param 1 of custom event callback (impacts tick and navigation too).
     view_dispatcher_set_event_callback_context(view_dispatcher, context);
@@ -179,6 +209,7 @@ int32_t js_app() {
     view_dispatcher_enable_queue(view_dispatcher);
     view_dispatcher_add_view(view_dispatcher, JSMain, view1);
     view_dispatcher_add_view(view_dispatcher, JSConsole, text_box_get_view(text_box));
+    view_dispatcher_add_view(view_dispatcher, JSConfirm, dialog_ex_get_view(dialog_ex));
 
     Gui* gui = furi_record_open(RECORD_GUI);
     view_dispatcher_attach_to_gui(view_dispatcher, gui, ViewDispatcherTypeFullscreen);
@@ -198,6 +229,7 @@ int32_t js_app() {
 
     view_dispatcher_remove_view(view_dispatcher, JSMain);
     view_dispatcher_remove_view(view_dispatcher, JSConsole);
+    view_dispatcher_remove_view(view_dispatcher, JSConfirm);
     furi_record_close(RECORD_GUI);
     view_dispatcher_free(view_dispatcher);
 
@@ -225,6 +257,24 @@ mvm_TeError resolveImport(mvm_HostFunctionID funcID, void* context, mvm_TfHostFu
         return MVM_E_SUCCESS;
     } else if (funcID == IMPORT_CONSOLE_WARN) {}
     return MVM_E_UNRESOLVED_IMPORT;
+}
+
+mvm_TeError confirm(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
+    UNUSED(vm);
+    UNUSED(funcID);
+    UNUSED(result);
+    UNUSED(args);
+    furi_assert(argCount == 0);
+    current_view = JSConfirm;
+    view_dispatcher_switch_to_view(view_dispatcher, JSConfirm);
+    while (!confirmGot) {}
+    if(confirmResult) {
+        FURI_LOG_I(TAG, "confirm(): Yes");
+    } else if (!confirmResult) {
+        FURI_LOG_I(TAG, "confirm(): No");
+    }
+    confirmGot = false;
+    return MVM_E_SUCCESS;
 }
 
 mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
