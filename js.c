@@ -70,21 +70,32 @@ typedef struct {
 Console* console;
 
 typedef enum {
+    CNone,
     CSetFont,
     CDrawStr,
 } CEvent;
 
 typedef struct {
+    CEvent cEvent;
     Font font;
+    char str[16];
+    int x;
+    iny y;
 } Display;
+
+Display* display;
 
 size_t fileSize;
 uint8_t* fileBuff;
 
 static void draw_callback(Canvas* canvas, void* context) {
     UNUSED(context);
-    canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str(canvas, 5, 30, "Hello world");
+    canvas_set_font(canvas, display->font);
+    if(display->cEvent == CDrawStr) {
+        // canvas_draw_str(canvas, 5, 30, "Hello world");
+        canvas_draw_str(canvas, display->x, display->y, display->str);
+        display->cEvent = CNone;
+    }
 }
 
 static bool input_callback(InputEvent* input_event, void* context) {
@@ -215,8 +226,14 @@ int32_t js_app() {
     current_view = JSDisplay;
     view_dispatcher_switch_to_view(view_dispatcher, current_view);
 
+    // console init
     console = malloc(sizeof(Console));
     console->conLog = furi_string_alloc();
+
+    // display init and set defaults
+    display = malloc(sizeof(Display));
+    display->cEvent = CNone;
+    display->font = FontSecondary;
 
     furi_thread_start(jsThread->thread);
     view_dispatcher_run(view_dispatcher);
@@ -249,21 +266,43 @@ void fatalError(void* vm, int e) {
  */
 mvm_TeError resolveImport(mvm_HostFunctionID funcID, void* context, mvm_TfHostFunction* out) {
     UNUSED(context);
-    if (funcID == IMPORT_CONSOLE_LOG) {
+    if (funcID == IMPORT_FLIPPER_CANVAS_SET_FONT) {
+        *out = flipper_canvas_set_font;
+        return MVM_E_SUCCESS;
+    } else if (funcID == IMPORT_FLIPPER_CANVAS_DRAW_STR) {
+        *out = flipper_canvas_draw_str;
+        return MVM_E_SUCCESS;
+    } else if (funcID == IMPORT_CONSOLE_LOG) {
       *out = console_log;
       return MVM_E_SUCCESS;
     } else if (funcID == IMPORT_CONSOLE_CLEAR) {
         *out = console_clear;
         return MVM_E_SUCCESS;
-    } else if (funcID == IMPORT_CONSOLE_WARN) {}
+    } else if (funcID == IMPORT_CONSOLE_WARN) {
+        *out = console_warn;
+        return MVM_E_SUCCESS;
+    }
     return MVM_E_UNRESOLVED_IMPORT;
 }
 
 mvm_TeError flipper_canvas_set_font(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
-    UNUSED(vm);
     UNUSED(funcID);
     UNUSED(result);
     furi_assert(argCount == 1);
+    FURI_LOG_I(TAG, "canvas_set_font()");
+    display->cEvent = CSetFont;
+    display->font = mvm_toInt32(vm, args[0]);
+    display->cEvent = CNone;
+    return MVM_E_SUCCESS;
+}
+
+mvm_TeError flipper_canvas_draw_str(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
+    UNUSED(funcID);
+    UNUSED(result);
+    furi_assert(argCount == 3);
+    FURI_LOG_I(TAG, "canvas_draw_str()");
+    display->str = (const char*)mvm_toStringUtf8(vm, args[2], NULL);
+    display->x = (int32_t)mvm_toInt32()
 }
 
 mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
@@ -272,7 +311,7 @@ mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* resu
     UNUSED(result);
     UNUSED(args);
     furi_assert(argCount == 0);
-    FURI_LOG_I(TAG, "console.clear()\n");
+    FURI_LOG_I(TAG, "console.clear()");
     furi_string_reset(console->conLog);
     text_box_set_text(text_box, furi_string_get_cstr(console->conLog));
     return MVM_E_SUCCESS;
@@ -282,7 +321,7 @@ mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result
     UNUSED(funcID);
     UNUSED(result);
     furi_assert(argCount == 1);
-    FURI_LOG_I(TAG, "console.log()\n");
+    FURI_LOG_I(TAG, "console.log()");
     furi_string_cat_printf(console->conLog, "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
     text_box_set_text(text_box, furi_string_get_cstr(console->conLog));
     return MVM_E_SUCCESS;
