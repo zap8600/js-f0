@@ -17,11 +17,12 @@
 static int32_t js_run(void* context);
 
 // A function in the host (this file) for the VM to call
-#define IMPORT_FLIPPER_CANVAS_SET_FONT 1
-#define IMPORT_FLIPPER_CANVAS_DRAW_STR 2
-#define IMPORT_CONSOLE_CLEAR 3
-#define IMPORT_CONSOLE_LOG 4
-#define IMPORT_CONSOLE_WARN 5
+#define IMPORT_FLIPPER_CANVAS_STOP 1
+#define IMPORT_FLIPPER_CANVAS_SET_FONT 2
+#define IMPORT_FLIPPER_CANVAS_DRAW_STR 3
+#define IMPORT_CONSOLE_CLEAR 4
+#define IMPORT_CONSOLE_LOG 5
+#define IMPORT_CONSOLE_WARN 6
 
 // A function exported by VM to for the host to call
 const mvm_VMExportID INIT = 1;
@@ -30,6 +31,7 @@ const mvm_VMExportID MAIN = 2;
 */
 
 mvm_TeError resolveImport(mvm_HostFunctionID id, void*, mvm_TfHostFunction* out);
+mvm_TeError flipper_canvas_stop(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError flipper_canvas_set_font(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError flipper_canvas_draw_str(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
@@ -71,12 +73,11 @@ Console* console;
 
 typedef enum {
     CNone,
-    CSetFont,
     CDrawStr,
-} CEvent;
+} CDrawEvent;
 
 typedef struct {
-    CEvent cEvent;
+    CDrawEvent cEvent;
     Font font;
     const char* str;
     int x;
@@ -285,14 +286,25 @@ mvm_TeError resolveImport(mvm_HostFunctionID funcID, void* context, mvm_TfHostFu
     return MVM_E_UNRESOLVED_IMPORT;
 }
 
+mvm_TeError flipper_canvas_stop(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
+    UNUSED(vm);
+    UNUSED(funcID);
+    UNUSED(result);
+    UNUSED(args);
+    furi_assert(argCount == 0);
+    FURI_LOG_I(TAG, "canvas_stop()");
+    display->cEvent = CNone;
+    return MVM_E_SUCCESS;
+}
+
 mvm_TeError flipper_canvas_set_font(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
     UNUSED(funcID);
     UNUSED(result);
     furi_assert(argCount == 1);
     FURI_LOG_I(TAG, "canvas_set_font()");
-    display->cEvent = CSetFont;
+    // display->cEvent = CSetFont;
     display->font = mvm_toInt32(vm, args[0]);
-    display->cEvent = CNone;
+    // display->cEvent = CNone;
     return MVM_E_SUCCESS;
 }
 
