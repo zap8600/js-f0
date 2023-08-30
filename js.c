@@ -58,6 +58,8 @@ ViewId current_view;
 
 ViewDispatcher* view_dispatcher;
 
+TextBox* text_box;
+
 bool confirmGot = false;
 bool confirmResult = false;
 
@@ -83,6 +85,7 @@ static bool input_callback(InputEvent* input_event, void* context) {
             handled = true;
         } else if (input_event->key == InputKeyUp) {
             js_run(fileBuff, sizeof(fileBuff));
+            text_box_set_text(text_box, furi_string_get_cstr(console->conLog));
             handled = true;
         }
     }
@@ -190,7 +193,7 @@ int32_t js_app() {
     view_set_input_callback(view1, input_callback);
     view_set_orientation(view1, ViewOrientationHorizontal);
 
-    TextBox* text_box = text_box_alloc();
+    text_box = text_box_alloc();
     text_box_set_font(text_box, TextBoxFontText);
     view_set_previous_callback(text_box_get_view(text_box), exit_console_callback);
 
@@ -219,8 +222,7 @@ int32_t js_app() {
     console = malloc(sizeof(Console));
     console->conLog = furi_string_alloc();
 
-    js_run(fileBuff, fileSize);
-    text_box_set_text(text_box, furi_string_get_cstr(console->conLog));
+    //js_run(fileBuff, fileSize);
 
     view_dispatcher_run(view_dispatcher);
 
