@@ -64,9 +64,10 @@ TextBox* text_box;
 
 typedef struct {
     FuriThread* thread;
-    size_t fileSize;
-    uint8_t* fileBuff;
 } JSRtThread;
+
+size_t fileSize;
+uint8_t* fileBuff;
 
 /*
 bool confirmGot = false;
@@ -144,7 +145,7 @@ void confirm_callback(DialogExResult result, void* context) {
 */
 
 static int32_t js_run(void* context) {
-    JSRtThread* jsThread = (JSRtThread*)context;
+    UNUSED(context);
 
     mvm_TeError err;
     mvm_VM* vm;
@@ -152,7 +153,7 @@ static int32_t js_run(void* context) {
     mvm_Value result;
 
     // Restore the VM from the snapshot
-    err = mvm_restore(&vm, jsThread->fileBuff, sizeof(jsThread->fileBuff), NULL, resolveImport);
+    err = mvm_restore(&vm, fileBuff, fileSize, NULL, resolveImport);
     if (err != MVM_E_SUCCESS) {
         FURI_LOG_E(TAG, "Error with restore: %d", err);
         return err;
@@ -184,10 +185,10 @@ int32_t js_app() {
     Storage* storage = furi_record_open(RECORD_STORAGE);
     File* bytecode = storage_file_alloc(storage);
     storage_file_open(bytecode, EXT_PATH("script.mvm-bc"), FSAM_READ, FSOM_OPEN_EXISTING);
-    jsThread->fileSize = storage_file_size(bytecode);
-    FURI_LOG_I("microvium", "File Size: %d", jsThread->fileSize);
-    jsThread->fileBuff = malloc(jsThread->fileSize);
-    storage_file_read(bytecode, jsThread->fileBuff, jsThread->fileSize);
+    fileSize = storage_file_size(bytecode);
+    FURI_LOG_I("microvium", "File Size: %d", fileSize);
+    fileBuff = malloc(fileSize);
+    storage_file_read(bytecode, fileBuff, fileSize);
     storage_file_close(bytecode);
     storage_file_free(bytecode);
     furi_record_close(RECORD_STORAGE);
