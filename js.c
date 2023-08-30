@@ -246,6 +246,8 @@ int32_t js_app() {
     furi_string_free(console->conLog);
     free(console);
 
+    free(display);
+
     view_dispatcher_remove_view(view_dispatcher, JSDisplay);
     view_dispatcher_remove_view(view_dispatcher, JSConsole);
     furi_record_close(RECORD_GUI);
