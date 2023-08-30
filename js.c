@@ -74,10 +74,9 @@ static void draw_callback(Canvas* canvas, void* context) {
 }
 
 static bool input_callback(InputEvent* input_event, void* context) {
-    furi_assert(context);
+    UNUSED(context);
     bool handled = false;
     // we set our callback context to be the view_dispatcher.
-    uint8_t* fileBuff = context;
 
     if(input_event->type == InputTypeShort) {
         if(input_event->key == InputKeyBack) {
@@ -190,7 +189,7 @@ int32_t js_app() {
     void* context = view_dispatcher;
 
     View* view1 = view_alloc();
-    view_set_context(view1, fileBuff);
+    view_set_context(view1, context);
     view_set_draw_callback(view1, draw_callback);
     view_set_input_callback(view1, input_callback);
     view_set_orientation(view1, ViewOrientationHorizontal);
