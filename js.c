@@ -64,6 +64,7 @@ TextBox* text_box;
 
 typedef struct {
     FuriThread* thread;
+    size_t fileSize;
     uint8_t* fileBuff;
 } JSRtThread;
 
@@ -180,19 +181,18 @@ static int32_t js_run(void* context) {
 int32_t js_app() {
     JSRtThread* jsThread = malloc(sizeof(JSRtThread));
 
-    jsThread->thread = furi_thread_alloc_ex("microium", 1024, js_run, jsThread);
-
     Storage* storage = furi_record_open(RECORD_STORAGE);
     File* bytecode = storage_file_alloc(storage);
     storage_file_open(bytecode, EXT_PATH("script.mvm-bc"), FSAM_READ, FSOM_OPEN_EXISTING);
-    size_t fileSize = storage_file_size(bytecode);
-    FURI_LOG_I("microvium", "File Size: %d", fileSize);
-    jsThread->fileBuff = malloc(fileSize);
-    storage_file_read(bytecode, jsThread->fileBuff, fileSize);
+    jsThread->fileSize = storage_file_size(bytecode);
+    FURI_LOG_I("microvium", "File Size: %d", jsThread->fileSize);
+    jsThread->fileBuff = malloc(jsThread->fileSize);
+    storage_file_read(bytecode, jsThread->fileBuff, jsThread->fileSize);
     storage_file_close(bytecode);
     storage_file_free(bytecode);
-
     furi_record_close(RECORD_STORAGE);
+
+    jsThread->thread = furi_thread_alloc_ex("microium", 1024, js_run, jsThread);
 
     view_dispatcher = view_dispatcher_alloc();
 
