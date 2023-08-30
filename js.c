@@ -93,6 +93,7 @@ static void draw_callback(Canvas* canvas, void* context) {
     canvas_set_font(canvas, display->font);
     if(display->cEvent == CDrawStr) {
         // canvas_draw_str(canvas, 5, 30, "Hello world");
+        FURI_LOG_I(TAG, "string to draw: %s", display->str);
         canvas_draw_str(canvas, display->x, display->y, display->str);
         display->cEvent = CNone;
     }
