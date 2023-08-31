@@ -27,9 +27,9 @@ static int32_t js_run(void* context);
 #define IMPORT_CONSOLE_WARN 8
 
 // A function exported by VM to for the host to call
-const mvm_VMExportID INIT = 1;
+const mvm_VMExportID MAIN = 1;
 /* Use when needed
-const mvm_VMExportID MAIN = 2;
+const mvm_VMExportID INIT = 2;
 */
 
 mvm_TeError resolveImport(mvm_HostFunctionID id, void*, mvm_TfHostFunction* out);
@@ -158,7 +158,7 @@ static int32_t js_run(void* context) {
 
     mvm_TeError err;
     mvm_VM* vm;
-    mvm_Value init;
+    mvm_Value main;
     mvm_Value result;
 
     // Restore the VM from the snapshot
@@ -169,14 +169,14 @@ static int32_t js_run(void* context) {
     }
 
     // Find the "sayHello" function exported by the VM
-    err = mvm_resolveExports(vm, &INIT, &init, 1);
+    err = mvm_resolveExports(vm, &MAIN, &main, 1);
     if (err != MVM_E_SUCCESS) {
         FURI_LOG_E(TAG, "Error with exports: %d", err);
         return err;
     }
 
-    // Call "sayHello"
-    err = mvm_call(vm, init, &result, NULL, 0);
+    // Call "main"
+    err = mvm_call(vm, main, &result, NULL, 0);
     if (err != MVM_E_SUCCESS) {
         FURI_LOG_E(TAG, "Error with call: %d", err);
         return err;
