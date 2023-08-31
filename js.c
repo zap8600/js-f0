@@ -17,12 +17,14 @@
 static int32_t js_run(void* context);
 
 // A function in the host (this file) for the VM to call
-#define IMPORT_FLIPPER_CANVAS_STOP 1
-#define IMPORT_FLIPPER_CANVAS_SET_FONT 2
-#define IMPORT_FLIPPER_CANVAS_DRAW_STR 3
-#define IMPORT_CONSOLE_CLEAR 4
-#define IMPORT_CONSOLE_LOG 5
-#define IMPORT_CONSOLE_WARN 6
+#define IMPORT_FLIPPER_FURI_DELAY_MS 1
+#define IMPORT_FLIPPER_CANVAS_STOP 2
+#define IMPORT_FLIPPER_CANVAS_SET_FONT 3
+#define IMPORT_FLIPPER_CANVAS_DRAW_STR 4
+#define IMPORT_FLIPPER_CANVAS_DRAW_STR_ALIGNED 5
+#define IMPORT_CONSOLE_CLEAR 6
+#define IMPORT_CONSOLE_LOG 7
+#define IMPORT_CONSOLE_WARN 8
 
 // A function exported by VM to for the host to call
 const mvm_VMExportID INIT = 1;
@@ -31,9 +33,11 @@ const mvm_VMExportID MAIN = 2;
 */
 
 mvm_TeError resolveImport(mvm_HostFunctionID id, void*, mvm_TfHostFunction* out);
+mvm_TeError flipper_furi_delay_ms(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError flipper_canvas_stop(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError flipper_canvas_set_font(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError flipper_canvas_draw_str(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
+mvm_TeError flipper_canvas_draw_str_aligned(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError console_warn(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
@@ -74,6 +78,7 @@ Console* console;
 typedef enum {
     CNone,
     CDrawStr,
+    CDrawStrAli,
 } CDrawEvent;
 
 typedef struct {
@@ -82,6 +87,8 @@ typedef struct {
     const char* str;
     int x;
     int y;
+    Align horizontal;
+    Align vertical;
 } Display;
 
 Display* display;
@@ -94,6 +101,8 @@ static void draw_callback(Canvas* canvas, void* context) {
     canvas_set_font(canvas, display->font);
     if(display->cEvent == CDrawStr) {
         canvas_draw_str(canvas, display->x, display->y, display->str);
+    } else if (display->cEvent == CDrawStrAli) {
+        canvas_draw_str_aligned(canvas, display->x, display->y, display->horizontal, display->vertical, display->str);
     }
 }
 
@@ -267,12 +276,16 @@ void fatalError(void* vm, int e) {
  */
 mvm_TeError resolveImport(mvm_HostFunctionID funcID, void* context, mvm_TfHostFunction* out) {
     UNUSED(context);
-    if (funcID == IMPORT_FLIPPER_CANVAS_SET_FONT) {
+    if (funcID == IMPORT_FLIPPER_FURI_DELAY_MS) {
+        *out = flipper_furi_delay_ms;
+    } else if (funcID == IMPORT_FLIPPER_CANVAS_SET_FONT) {
         *out = flipper_canvas_set_font;
         return MVM_E_SUCCESS;
     } else if (funcID == IMPORT_FLIPPER_CANVAS_DRAW_STR) {
         *out = flipper_canvas_draw_str;
         return MVM_E_SUCCESS;
+    } else if (funcID == IMPORT_FLIPPER_CANVAS_DRAW_STR_ALIGNED) {
+        *out = flipper_canvas_draw_str_aligned;
     } else if (funcID == IMPORT_CONSOLE_LOG) {
       *out = console_log;
       return MVM_E_SUCCESS;
@@ -284,6 +297,15 @@ mvm_TeError resolveImport(mvm_HostFunctionID funcID, void* context, mvm_TfHostFu
         return MVM_E_SUCCESS;
     }
     return MVM_E_UNRESOLVED_IMPORT;
+}
+
+mvm_TeError flipper_furi_delay_ms(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
+    UNUSED(funcID);
+    UNUSED(result);
+    furi_assert(argCount == 1);
+    FURI_LOG_I(TAG, "delay_ms()");
+    furi_delay_ms((int32_t)mvm_toInt32(vm, args[0]));
+    return MVM_E_SUCCESS;
 }
 
 mvm_TeError flipper_canvas_stop(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
@@ -317,6 +339,20 @@ mvm_TeError flipper_canvas_draw_str(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_V
     display->y = (int32_t)mvm_toInt32(vm, args[1]);
     display->str = (const char*)mvm_toStringUtf8(vm, args[2], NULL);
     display->cEvent = CDrawStr;
+    return MVM_E_SUCCESS;
+}
+
+mvm_TeError flipper_canvas_draw_str_aligned(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
+    UNUSED(funcID);
+    UNUSED(result);
+    furi_assert(argCount == 5);
+    FURI_LOG_I(TAG, "canvas_draw_str_aligned()");
+    display->x = (int32_t)mvm_toInt32(vm, args[0]);
+    display->y = (int32_t)mvm_toInt32(vm, args[1]);
+    display->horizontal = (int32_t)mvm_toInt32(vm, args[2]);
+    display->vertical = (int32_t)mvm_toInt32(vm, args[3]);
+    display->str = (const char*)mvm_toStringUtf8(vm, args[4], NULL);
+    display->cEvent = CDrawStrAli;
     return MVM_E_SUCCESS;
 }
 
