@@ -16,6 +16,6 @@ function main() {
 vmExport(1, main);
 ```
 3. Compile it with `microvium script.mvm.js`. This will make a file in the same directory called `script.mvm-bc`.
-4. Copy `script.mvm-bc` to `/ext` on your Flipper Zero.
+4. Copy `script.mvm-bc` to `/ext/apps_data/js` on your Flipper Zero.
 5. Run `JavaScript` on your Flipper Zero.
 6. Press the center button to open the console and find "Hello, world!" in the log! 

@@ -12,6 +12,7 @@
 
 #include "microvium.h"
 
+#define JS_APP_PATH_FOLDER STORAGE_APP_DATA_PATH_PREFIX
 #define TAG "microvium"
 
 static int32_t js_run(void* context);
@@ -193,7 +194,7 @@ int32_t js_app() {
 
     Storage* storage = furi_record_open(RECORD_STORAGE);
     File* bytecode = storage_file_alloc(storage);
-    storage_file_open(bytecode, EXT_PATH("script.mvm-bc"), FSAM_READ, FSOM_OPEN_EXISTING);
+    storage_file_open(bytecode, APP_DATA_PATH("script.mvm-bc"), FSAM_READ, FSOM_OPEN_EXISTING);
     fileSize = storage_file_size(bytecode);
     FURI_LOG_I("microvium", "File Size: %d", fileSize);
     fileBuff = malloc(fileSize);
