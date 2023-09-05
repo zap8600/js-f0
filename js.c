@@ -56,7 +56,7 @@ typedef struct {
 typedef enum {
     JSDisplay,
     JSConsole,
-    //JSConfirm,
+    // JSConfirm,
 } ViewId;
 
 FuriMessageQueue* queue;
@@ -65,6 +65,11 @@ ViewId current_view;
 ViewDispatcher* view_dispatcher;
 
 TextBox* text_box;
+
+/*
+bool confirmGot = false;
+bool confirmRes = false;
+*/
 
 typedef struct {
     FuriThread* thread;
@@ -220,6 +225,14 @@ int32_t js_app() {
     text_box_set_font(text_box, TextBoxFontText);
     view_set_previous_callback(text_box_get_view(text_box), exit_console_callback);
 
+    /*
+    DialogEx* dialog_ex = dialog_ex_alloc();
+    dialog_ex_set_left_button_text(dialog_ex, "No");
+    dialog_ex_set_right_button_text(dialog_ex, "Yes");
+    dialog_ex_set_context(dialog_ex, context);
+    dialog_ex_set_result_callback(dialog_ex, confirm_callback);
+    */
+
     // set param 1 of custom event callback (impacts tick and navigation too).
     view_dispatcher_set_event_callback_context(view_dispatcher, context);
     view_dispatcher_set_navigation_event_callback(
@@ -229,6 +242,7 @@ int32_t js_app() {
     view_dispatcher_enable_queue(view_dispatcher);
     view_dispatcher_add_view(view_dispatcher, JSDisplay, view1);
     view_dispatcher_add_view(view_dispatcher, JSConsole, text_box_get_view(text_box));
+    //view_dispatcher_add_view(view_dispatcher, JSConfirm, dialog_ex_get_view(dialog_ex));
 
     Gui* gui = furi_record_open(RECORD_GUI);
     view_dispatcher_attach_to_gui(view_dispatcher, gui, ViewDispatcherTypeFullscreen);
@@ -372,9 +386,15 @@ mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* resu
 mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
     UNUSED(funcID);
     UNUSED(result);
-    furi_assert(argCount == 1);
     FURI_LOG_I(TAG, "console.log()");
-    furi_string_cat_printf(console->conLog, "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
+    for (int i = 0; i < argCount-1; i++) {
+        if(mvm_typeOf(vm, args[i]) == VM_T_NUMBER) {
+            furi_string_cat_printf(console->conLog, "%d\n", (const char*)mvm_toInt32(vm, args[i]));
+        } else if (mvm_typeOf(vm, args[i]) == VM_T_STRING) {
+            furi_string_cat_printf(console->conLog, "%s\n", (const char*)mvm_toStringUtf8(vm, args[i], NULL));
+        }
+    }
+    furi_string_cat_printf(console->conLog, "\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
     text_box_set_text(text_box, furi_string_get_cstr(console->conLog));
     return MVM_E_SUCCESS;
 }
