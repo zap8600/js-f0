@@ -404,6 +404,13 @@ mvm_TeError console_warn(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* resul
     UNUSED(result);
     furi_assert(argCount == 1);
     FURI_LOG_I(TAG, "console.warn()");
-    FURI_LOG_W(TAG, "%s\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
+    for (int i = 0; i < argCount-1; i++) {
+        if(mvm_typeOf(vm, args[i]) == VM_T_NUMBER) {
+            FURI_LOG_W(TAG, "%d", (int)mvm_toInt32(vm, args[i]));
+        } else if (mvm_typeOf(vm, args[i]) == VM_T_STRING) {
+            FURI_LOG_W(TAG, "%s", (const char*)mvm_toStringUtf8(vm, args[i], NULL));
+        }
+    }
+    FURI_LOG_W(TAG, "\n");
     return MVM_E_SUCCESS;
 }
