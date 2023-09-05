@@ -394,7 +394,7 @@ mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result
             furi_string_cat_printf(console->conLog, "%s", (const char*)mvm_toStringUtf8(vm, args[i], NULL));
         }
     }
-    furi_string_cat_printf(console->conLog, "\n", (const char*)mvm_toStringUtf8(vm, args[0], NULL));
+    furi_string_cat_printf(console->conLog, "\n");
     text_box_set_text(text_box, furi_string_get_cstr(console->conLog));
     return MVM_E_SUCCESS;
 }
