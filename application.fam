@@ -11,4 +11,6 @@ App(
             cflags=["-Wno-implicit-function-declaration", "-Wno-unused-parameter", "-Wno-char-subscripts", "-Wno-double-promotion", "-Wno-redundant-decls"],
         ),
     ],
+    fap_icon="js.png",
+    fap_category="Tools",
 )
