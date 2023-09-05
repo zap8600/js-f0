@@ -389,7 +389,7 @@ mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result
     FURI_LOG_I(TAG, "console.log()");
     for (int i = 0; i < argCount-1; i++) {
         if(mvm_typeOf(vm, args[i]) == VM_T_NUMBER) {
-            furi_string_cat_printf(console->conLog, "%d\n", (const char*)mvm_toInt32(vm, args[i]));
+            furi_string_cat_printf(console->conLog, "%d\n", (int32_t)mvm_toInt32(vm, args[i]));
         } else if (mvm_typeOf(vm, args[i]) == VM_T_STRING) {
             furi_string_cat_printf(console->conLog, "%s\n", (const char*)mvm_toStringUtf8(vm, args[i], NULL));
         }
