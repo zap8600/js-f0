@@ -21,3 +21,9 @@ vmExport(1, main);
 4. Copy `script.mvm-bc` to `/ext/apps_data/js` on your Flipper Zero.
 5. Run `JavaScript` on your Flipper Zero.
 6. Press the center button to open the console and find "Hello, world!" in the log! 
+## Fully implemented standard functions
+* `console.log()`
+* `console.warn()`
+* `console.clear()`
+## Planned standard functions
+* `confirm()`
