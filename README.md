@@ -1,7 +1,7 @@
 # js-f0
 JavaScript... on the Flipper Zero?
 ## Notice
-I'm taking a break from this. I've worked too much on this, and it feels really repetitive now. I'll still accept pull requests for any changes.
+I'll be returning from my break. Development will be slow, as I have other priorities, but with the amount of interest being shown, I'd feel bad for not putting in work.
 ## How?
 This is all possible using the [microvium JavaScript engine](https://github.com/coder-mike/microvium). Check it out!
 ## Installation
