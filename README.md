@@ -25,5 +25,5 @@ vmExport(1, main);
 * `console.log()`
 * `console.warn()`
 * `console.clear()`
-## Planned standard functions
+## Currently WIP standard functions
 * `confirm()`
