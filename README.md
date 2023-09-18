@@ -25,5 +25,7 @@ vmExport(1, main);
 * `console.log()`
 * `console.warn()`
 * `console.clear()`
+## Incomplete implemented standard functions
+* `fs.openSync()` - Untested
 ## Currently WIP standard functions
 * `confirm()`
