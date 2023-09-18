@@ -221,7 +221,7 @@ int32_t js_app() {
     storage_file_free(bytecode);
     //furi_record_close(RECORD_STORAGE);
 
-    for (i = 0; i < 2; ++i) {
+    for (int i = 0; i < 2; ++i) {
         jsFile[i].is_alloc = false;
         jsFile[i].is_open = false;
     }
@@ -290,7 +290,7 @@ int32_t js_app() {
 
     free(fileBuff);
 
-    for (i = 0; i < 2; ++i) {
+    for (int i = 0; i < 2; ++i) {
         if(jsFile[i].is_alloc) {
             if(jsFile[i].is_open) {
                 storage_file_close(jsFile[i].file);
@@ -454,14 +454,14 @@ mvm_TeError fs_open_sync(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* resul
     furi_assert(argCount == 2);
     //const char* path = (const char*)mvm_toStringUtf8(vm, args[0], NULL);
     //const char* type = (const char*)mvm_toStringUtf8(vm, args[1], NULL);
-    for (i = 0; i < 2; ++i) {
+    for (int i = 0; i < 2; ++i) {
         if (!jsFile[i].is_alloc) {
             jsFile[i].file = storage_file_alloc(storage);
             jsFile[i].is_alloc = true;
         }
         if (!jsFile[i].is_open) {
             jsFile[i].path = (const char*)mvm_toStringUtf8(vm, args[0], NULL);
-            storage_file_open(jsFile[i].file, path, FSAM_READ, FSOM_OPEN_EXISTING);
+            storage_file_open(jsFile[i].file, jsFile[i].path, FSAM_READ, FSOM_OPEN_EXISTING);
             jsFile[i].is_open = true;
             *result = mvm_newInt32(vm, i);
             return MVM_E_SUCCESS;
