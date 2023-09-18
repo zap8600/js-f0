@@ -1,6 +1,7 @@
 // main.c
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <assert.h>
 #include <furi.h>
 #include <gui/gui.h>
@@ -26,6 +27,7 @@ static int32_t js_run(void* context);
 #define IMPORT_CONSOLE_CLEAR 6
 #define IMPORT_CONSOLE_LOG 7
 #define IMPORT_CONSOLE_WARN 8
+#define IMPORT_FS_OPEN_SYNC 9
 
 // A function exported by VM to for the host to call
 const mvm_VMExportID MAIN = 1;
@@ -42,6 +44,7 @@ mvm_TeError flipper_canvas_draw_str_aligned(mvm_VM* vm, mvm_HostFunctionID funcI
 mvm_TeError console_clear(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError console_log(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 mvm_TeError console_warn(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
+mvm_TeError fs_open_sync(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount);
 
 typedef enum {
     MyEventTypeKey,
@@ -99,6 +102,16 @@ typedef struct {
 
 Display* display;
 
+typedef struct {
+    bool is_alloc;
+    File* file;
+    bool is_open;
+    const char* path;
+} JSFile;
+
+JSFile jsFile[3];
+
+Storage* storage;
 size_t fileSize;
 uint8_t* fileBuff;
 
@@ -197,7 +210,7 @@ static int32_t js_run(void* context) {
 int32_t js_app() {
     JSRtThread* jsThread = malloc(sizeof(JSRtThread));
 
-    Storage* storage = furi_record_open(RECORD_STORAGE);
+    storage = furi_record_open(RECORD_STORAGE);
     File* bytecode = storage_file_alloc(storage);
     storage_file_open(bytecode, APP_DATA_PATH("script.mvm-bc"), FSAM_READ, FSOM_OPEN_EXISTING);
     fileSize = storage_file_size(bytecode);
@@ -206,7 +219,12 @@ int32_t js_app() {
     storage_file_read(bytecode, fileBuff, fileSize);
     storage_file_close(bytecode);
     storage_file_free(bytecode);
-    furi_record_close(RECORD_STORAGE);
+    //furi_record_close(RECORD_STORAGE);
+
+    for (i = 0; i < 2; ++i) {
+        jsFile[i].is_alloc = false;
+        jsFile[i].is_open = false;
+    }
 
     jsThread->thread = furi_thread_alloc_ex("microium", 1024, js_run, jsThread);
 
@@ -270,6 +288,19 @@ int32_t js_app() {
 
     free(display);
 
+    free(fileBuff);
+
+    for (i = 0; i < 2; ++i) {
+        if(jsFile[i].is_alloc) {
+            if(jsFile[i].is_open) {
+                storage_file_close(jsFile[i].file);
+                jsFile[i].is_open = false;
+            }
+            storage_file_free(jsFile[i].file);
+            jsFile[i].is_alloc = false;
+        }
+    }
+
     view_dispatcher_remove_view(view_dispatcher, JSDisplay);
     view_dispatcher_remove_view(view_dispatcher, JSConsole);
     furi_record_close(RECORD_GUI);
@@ -309,6 +340,9 @@ mvm_TeError resolveImport(mvm_HostFunctionID funcID, void* context, mvm_TfHostFu
         return MVM_E_SUCCESS;
     } else if (funcID == IMPORT_CONSOLE_WARN) {
         *out = console_warn;
+        return MVM_E_SUCCESS;
+    } else if (funcID == IMPORT_FS_OPEN_SYNC) {
+        *out = fs_open_sync;
         return MVM_E_SUCCESS;
     }
     return MVM_E_UNRESOLVED_IMPORT;
@@ -413,4 +447,25 @@ mvm_TeError console_warn(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* resul
     }
     FURI_LOG_W(TAG, "\n");
     return MVM_E_SUCCESS;
+}
+
+mvm_TeError fs_open_sync(mvm_VM* vm, mvm_HostFunctionID funcID, mvm_Value* result, mvm_Value* args, uint8_t argCount) {
+    UNUSED(funcID);
+    furi_assert(argCount == 2);
+    //const char* path = (const char*)mvm_toStringUtf8(vm, args[0], NULL);
+    //const char* type = (const char*)mvm_toStringUtf8(vm, args[1], NULL);
+    for (i = 0; i < 2; ++i) {
+        if (!jsFile[i].is_alloc) {
+            jsFile[i].file = storage_file_alloc(storage);
+            jsFile[i].is_alloc = true;
+        }
+        if (!jsFile[i].is_open) {
+            jsFile[i].path = (const char*)mvm_toStringUtf8(vm, args[0], NULL);
+            storage_file_open(jsFile[i].file, path, FSAM_READ, FSOM_OPEN_EXISTING);
+            jsFile[i].is_open = true;
+            *result = mvm_newInt32(vm, i);
+            return MVM_E_SUCCESS;
+        }
+    }
+    return MVM_E_SUCCESS; // todo: return error
 }
